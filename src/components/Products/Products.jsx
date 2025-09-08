@@ -570,19 +570,19 @@ function Products() {
   return (
     <div className="products">
       <Helmet>
-        <title>Mahindra Sri Crackers - Diwali Special Offers 2024</title>
+        <title> UDHAYAM CRACKERS - Diwali Special Offers 2024</title>
         <meta name="description" content="Browse our wide selection of high-quality crackers for all occasions. Filter by climate, search for specific products, and easily manage your cart." />
-        <meta property="og:title" content="Mahithraa Sri Crackers - Product Catalog" />
+        <meta property="og:title" content="Udhayam Crackers - Product Catalog" />
         <meta property="og:description" content="Explore our diverse range of crackers. From morning to night, fancy to gift boxes, we have it all. Shop now for the best deals!" />
         <meta property="og:image" content={logo} />
-        <meta property="og:url" content="https://www.mahithraasricrackers.com/products" />
+        <meta property="og:url" content="https://www.udhayamcrackers.com/products" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Mahithraa Sri Crackers - Product Catalog" />
+        <meta name="twitter:title" content="Udhayam Crackers - Product Catalog" />
         <meta name="twitter:description" content="Discover our extensive range of crackers for all your celebration needs. Easy filtering and search options available." />
         <meta name="twitter:image" content={logo} />
         <meta name="keywords" content="crackers, fireworks, Diwali, celebration, morning crackers, night crackers, fancy crackers, gift boxes" />
-        <meta name="author" content="Mahithraa Sri Crackers" />
+        <meta name="author" content="Udhayam Crackers" />
         <meta name="robots" content="index, follow" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <script type="application/ld+json">
@@ -590,9 +590,9 @@ function Products() {
             {
               "@context": "http://schema.org",
               "@type": "ItemList",
-              "name": "MAHITHRAA SRI CRACKERS Product Catalog",
+              "name": "UDHAYAM CRACKERS Product Catalog",
               "description": "Browse our wide selection of high-quality crackers for all occasions.",
-              "url": "https://www.mahithraasricrackers.com/products",
+              "url": "https://www.udhayamcrackers.com/products",
               "numberOfItems": "${products.length}",
               "itemListElement": [
                 ${products.map((product, index) => `
