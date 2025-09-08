@@ -101,7 +101,7 @@ const HeroContainerHome = () => {
               <img src={logo} alt="" />
             </div>
           </h1>
-          <p className="text-lg md:text-xl lg:text-2xl italic"> Celebration Begins</p>
+          <p className="text-lg md:text-xl lg:text-2xl italic">  Begins</p>
         </div>
         
         <div className="text-center mb-8">
