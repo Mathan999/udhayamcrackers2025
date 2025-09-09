@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+import  { useState, useEffect } from "react";
 import { ref as dbRef, onValue, remove, update } from "firebase/database";
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { database, storage } from "../../firebase";
-import { X, Edit, Trash2, Upload } from "lucide-react";
+import { database } from "../../firebase";
+import { X, Edit, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
 function Products1() {
-  const [filter, setFilter] = useState('all');
+  const [filter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [products, setProducts] = useState([]);
@@ -15,19 +15,32 @@ function Products1() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [newImage, setNewImage] = useState(null);
 
+  // Cloudinary configuration
+  const CLOUDINARY_UPLOAD_PRESET = "mahithra"; // Replace with your Cloudinary unsigned upload preset
+  const CLOUDINARY_CLOUD_NAME = "dirbsbdfh"; // Replace with your Cloudinary cloud name
+  const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
   useEffect(() => {
     const productsRef = dbRef(database, 'products');
-    onValue(productsRef, (snapshot) => {
+    const unsubscribe = onValue(productsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const loadedProducts = Object.entries(data).map(([key, value]) => ({
           id: key,
           ...value,
-          climate: value.climate || 'Unspecified'
+          climate: value.climate || 'Unspecified',
+          imageUrl: value.imageUrl || 'https://res.cloudinary.com/dirbsbdfh/image/upload/v1736330400/default-product-image_mqjqzs.png'
         }));
         setProducts(loadedProducts);
+      } else {
+        setProducts([]);
       }
+    }, (error) => {
+      console.error("Error fetching products:", error);
+      setError("Failed to fetch products. Please try again.");
     });
+
+    return () => unsubscribe();
   }, []);
 
   const filteredProducts = products.filter(product =>
@@ -55,7 +68,7 @@ function Products1() {
   };
 
   const handleEdit = (product) => {
-    setEditingProduct(product);
+    setEditingProduct({ ...product });
     setNewImage(null);
   };
 
@@ -66,60 +79,76 @@ function Products1() {
   };
 
   const handleSave = async () => {
-    if (editingProduct) {
-      let updatedProduct = { ...editingProduct };
+    if (!editingProduct) return;
 
-      if (newImage) {
-        try {
-          const imageRef = storageRef(storage, `product_images/${editingProduct.id}`);
-          await uploadBytes(imageRef, newImage);
-          const downloadURL = await getDownloadURL(imageRef);
-          updatedProduct.imageUrl = downloadURL;
-        } catch (error) {
-          console.error("Error uploading image:", error);
-          setError("There was an error uploading the image. Please try again.");
-          return;
-        }
-      }
+    setError(null);
+    let updatedProduct = { ...editingProduct };
 
-      const productRef = dbRef(database, `products/${editingProduct.id}`);
-      update(productRef, updatedProduct)
-        .then(() => {
-          setEditingProduct(null);
-          setProducts(prevProducts => prevProducts.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-          setNewImage(null);
-        })
-        .catch((error) => {
-          console.error("Error updating product:", error);
-          setError("There was an error updating the product. Please try again.");
+    if (newImage) {
+      try {
+        const formData = new FormData();
+        formData.append("file", newImage);
+        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+        const response = await axios.post(CLOUDINARY_UPLOAD_URL, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          }
         });
+
+        if (response.data.secure_url) {
+          updatedProduct.imageUrl = response.data.secure_url;
+        } else {
+          throw new Error("Failed to upload image to Cloudinary");
+        }
+      } catch (error) {
+        console.error("Error uploading image to Cloudinary:", error);
+        setError("Failed to upload image. Please try again.");
+        return;
+      }
+    }
+
+    try {
+      const productRef = dbRef(database, `products/${editingProduct.id}`);
+      await update(productRef, {
+        productName: updatedProduct.productName,
+        code: updatedProduct.code,
+        category: updatedProduct.category,
+        climate: updatedProduct.climate,
+        mrp: updatedProduct.mrp,
+        discount: updatedProduct.discount,
+        ourPrice: updatedProduct.ourPrice,
+        imageUrl: updatedProduct.imageUrl
+      });
+
+      setProducts(prevProducts => 
+        prevProducts.map(p => p.id === updatedProduct.id ? updatedProduct : p)
+      );
+      setEditingProduct(null);
+      setNewImage(null);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      setError("Failed to update product. Please try again.");
     }
   };
 
-  const handleDelete = (productId) => {
+  const handleDelete = async (productId) => {
     if (window.confirm("Are you sure you want to delete this product?")) {
-      const productRef = dbRef(database, `products/${productId}`);
-      remove(productRef)
-        .then(() => {
-          setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
-        })
-        .catch((error) => {
-          console.error("Error deleting product:", error);
-          setError("There was an error deleting the product. Please try again.");
-        });
+      try {
+        const productRef = dbRef(database, `products/${productId}`);
+        await remove(productRef);
+        setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+        setCart(prevCart => prevCart.filter(item => item.id !== productId));
+      } catch (error) {
+        console.error("Error deleting product:", error);
+        setError("Failed to delete product. Please try again.");
+      }
     }
   };
 
   return (
     <>
       <div className="container mx-auto px-4 py-8">
-        {/* <div className="mb-6 flex flex-wrap gap-2">
-          <button onClick={() => setFilter('all')} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">All</button>
-          <button onClick={() => setFilter('morning')} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Morning</button>
-          <button onClick={() => setFilter('night')} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Night</button>
-          <button onClick={() => setFilter('fancy')} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Fancy</button>
-          <button onClick={() => setFilter('giftbox')} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">GiftBox</button>
-        </div> */}
         <Link to='/admin' className="text-2xl bg-gray-400 px-2 py-3 rounded-2xl" style={{ marginBottom: '30px'}}> ⬅ Back</Link>
         <input
           type="text"
@@ -153,47 +182,110 @@ function Products1() {
                       <div className="flex flex-col items-center">
                         <img 
                           src={newImage ? URL.createObjectURL(newImage) : product.imageUrl} 
-                          alt={product.productName} 
+                          alt={product.productName || 'Product'} 
                           className="w-20 h-20 object-cover mb-2"
+                          onError={(e) => {
+                            e.target.src = 'https://res.cloudinary.com/dirbsbdfh/image/upload/v1736330400/default-product-image_mqjqzs.png';
+                          }}
                         />
-                        <input type="file" onChange={handleImageChange} accept="image/*" className="text-sm" />
+                        <input 
+                          type="file" 
+                          onChange={handleImageChange} 
+                          accept="image/*" 
+                          className="text-sm" 
+                        />
                       </div>
                     ) : (
                       <img 
                         src={product.imageUrl} 
-                        alt={product.productName} 
+                        alt={product.productName || 'Product'} 
                         className="w-20 h-20 object-cover cursor-pointer" 
                         onClick={() => setSelectedImage(product.imageUrl)}
+                        onError={(e) => {
+                          e.target.src = 'https://res.cloudinary.com/dirbsbdfh/image/upload/v1736330400/default-product-image_mqjqzs.png';
+                        }}
                       />
                     )}
                   </td>
-                  <td className="px-4 py-2">{editingProduct?.id === product.id ? 
-                    <input value={editingProduct.code} onChange={(e) => setEditingProduct({...editingProduct, code: e.target.value})} className="w-full p-1 border rounded" /> : 
-                    product.code}
+                  <td className="px-4 py-2">
+                    {editingProduct?.id === product.id ? (
+                      <input 
+                        value={editingProduct.code || ''} 
+                        onChange={(e) => setEditingProduct({...editingProduct, code: e.target.value})} 
+                        className="w-full p-1 border rounded" 
+                      />
+                    ) : (
+                      product.code || '-'
+                    )}
                   </td>
-                  <td className="px-4 py-2">{editingProduct?.id === product.id ? 
-                    <input value={editingProduct.productName} onChange={(e) => setEditingProduct({...editingProduct, productName: e.target.value})} className="w-full p-1 border rounded" /> : 
-                    product.productName}
+                  <td className="px-4 py-2">
+                    {editingProduct?.id === product.id ? (
+                      <input 
+                        value={editingProduct.productName || ''} 
+                        onChange={(e) => setEditingProduct({...editingProduct, productName: e.target.value})} 
+                        className="w-full p-1 border rounded" 
+                      />
+                    ) : (
+                      product.productName || '-'
+                    )}
                   </td>
-                  <td className="px-4 py-2">{editingProduct?.id === product.id ? 
-                    <input value={editingProduct.category} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full p-1 border rounded" /> : 
-                    product.category}
+                  <td className="px-4 py-2">
+                    {editingProduct?.id === product.id ? (
+                      <input 
+                        value={editingProduct.category || ''} 
+                        onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})} 
+                        className="w-full p-1 border rounded" 
+                      />
+                    ) : (
+                      product.category || '-'
+                    )}
                   </td>
-                  <td className="px-4 py-2">{editingProduct?.id === product.id ? 
-                    <input value={editingProduct.climate} onChange={(e) => setEditingProduct({...editingProduct, climate: e.target.value})} className="w-full p-1 border rounded" /> : 
-                    product.climate || 'Unspecified'}
+                  <td className="px-4 py-2">
+                    {editingProduct?.id === product.id ? (
+                      <input 
+                        value={editingProduct.climate || ''} 
+                        onChange={(e) => setEditingProduct({...editingProduct, climate: e.target.value})} 
+                        className="w-full p-1 border rounded" 
+                      />
+                    ) : (
+                      product.climate || 'Unspecified'
+                    )}
                   </td>
-                  <td className="px-4 py-2">{editingProduct?.id === product.id ? 
-                    <input type="number" value={editingProduct.mrp} onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} className="w-full p-1 border rounded" /> : 
-                    <s>₹{product.mrp}</s>}
+                  <td className="px-4 py-2">
+                    {editingProduct?.id === product.id ? (
+                      <input 
+                        type="number" 
+                        value={editingProduct.mrp || ''} 
+                        onChange={(e) => setEditingProduct({...editingProduct, mrp: e.target.value})} 
+                        className="w-full p-1 border rounded" 
+                      />
+                    ) : (
+                      <s>₹{Number(product.mrp || 0).toFixed(2)}</s>
+                    )}
                   </td>
-                  <td className="px-4 py-2">{editingProduct?.id === product.id ? 
-                    <input type="number" value={editingProduct.discount} onChange={(e) => setEditingProduct({...editingProduct, discount: e.target.value})} className="w-full p-1 border rounded" /> : 
-                    `${product.discount}%`}
+                  <td className="px-4 py-2">
+                    {editingProduct?.id === product.id ? (
+                      <input 
+                        type="number" 
+                        value={editingProduct.discount || ''} 
+                        onChange={(e) => setEditingProduct({...editingProduct, discount: e.target.value})} 
+                        className="w-full p-1 border rounded" 
+                      />
+                    ) : (
+                      `${product.discount || 0}%`
+                    )}
                   </td>
-                  <td className="px-4 py-2">{editingProduct?.id === product.id ? 
-                    <input type="number" value={editingProduct.ourPrice} onChange={(e) => setEditingProduct({...editingProduct, ourPrice: e.target.value})} className="w-full p-1 border rounded" /> : 
-                    `₹${product.ourPrice}`}
+                  <td className="px-4 py-2">
+                    {editingProduct?.id === product.id ? (
+                      <input 
+                        type="number" 
+                        value={editingProduct.ourPrice || ''} 
+                        onChange={(e) => setEditingProduct({...editingProduct, ourPrice: e.target.value})} 
+                        className="w-full p-1 border rounded" 
+                      />
+                    ) : (
+                      `₹${Number(product.ourPrice || 0).toFixed(2)}`
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <input 
@@ -205,14 +297,31 @@ function Products1() {
                       placeholder="0"
                     />
                   </td>
-                  <td className="px-4 py-2">₹{product.ourPrice * (cart.find(item => item.id === product.id)?.quantity || 0)}</td>
+                  <td className="px-4 py-2">
+                    ₹{(Number(product.ourPrice || 0) * (cart.find(item => item.id === product.id)?.quantity || 0)).toFixed(2)}
+                  </td>
                   <td className="px-4 py-2">
                     {editingProduct?.id === product.id ? (
-                      <button onClick={handleSave} className="p-1 bg-green-500 text-white rounded hover:bg-green-600"><X size={18} /></button>
+                      <button 
+                        onClick={handleSave} 
+                        className="p-1 bg-green-500 text-white rounded hover:bg-green-600"
+                      >
+                        <X size={18} />
+                      </button>
                     ) : (
                       <div className="flex gap-2">
-                        <button onClick={() => handleEdit(product)} className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600"><Edit size={18} /></button>
-                        <button onClick={() => handleDelete(product.id)} className="p-1 bg-red-500 text-white rounded hover:bg-red-600"><Trash2 size={18} /></button>
+                        <button 
+                          onClick={() => handleEdit(product)} 
+                          className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(product.id)} 
+                          className="p-1 bg-red-500 text-white rounded hover:bg-red-600"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </div>
                     )}
                   </td>
@@ -223,10 +332,23 @@ function Products1() {
         </div>
         {error && <p className="text-red-500 mt-4">{error}</p>}
         {selectedImage && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" onClick={() => setSelectedImage(null)}>
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" 
+            onClick={() => setSelectedImage(null)}
+          >
             <div className="relative">
-              <img src={selectedImage} alt="Full size product" className="max-w-full max-h-full" />
-              <button className="absolute top-2 right-2 bg-white rounded-full p-1" onClick={() => setSelectedImage(null)}>
+              <img 
+                src={selectedImage} 
+                alt="Full size product" 
+                className="max-w-full max-h-full" 
+                onError={(e) => {
+                  e.target.src = 'https://res.cloudinary.com/dirbsbdfh/image/upload/v1736330400/default-product-image_mqjqzs.png';
+                }}
+              />
+              <button 
+                className="absolute top-2 right-2 bg-white rounded-full p-1" 
+                onClick={() => setSelectedImage(null)}
+              >
                 <X size={24} />
               </button>
             </div>

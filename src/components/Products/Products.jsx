@@ -8,7 +8,7 @@ import "./Products.css";
 
 // Use absolute paths for assets in the public folder
 const qrCodeImage = '../assets/qr_code.webp'; // Adjust the path as necessary
-const logo = '../assets/logo_1x1.png';
+const defaultProductImage = '../assets/logo_1x1.png'; // Default image path
 
 function Products() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,6 +64,29 @@ function Products() {
   "50 SPARKLERS", 
 ];
 
+  // Function to get the correct image URL
+  const getImageUrl = (product) => {
+    if (product.imageUrl) {
+      // If it's a Cloudinary URL, use it directly
+      if (product.imageUrl.includes('cloudinary.com') || product.imageUrl.startsWith('http')) {
+        return product.imageUrl;
+      }
+      // If it's a local path, use it directly
+      return product.imageUrl;
+    }
+    // Fallback to default image
+    return defaultProductImage;
+  };
+
+  // Function to handle image loading errors
+  const handleImageError = (e, product) => {
+    console.error(`Failed to load image for ${product.productName}: ${e.target.src}`);
+    // Try to use default image as fallback
+    if (e.target.src !== defaultProductImage) {
+      e.target.src = defaultProductImage;
+    }
+  };
+
   const handleScroll = useCallback(() => {
     const tableContainer = document.querySelector('.table-container');
     if (tableContainer) {
@@ -90,7 +113,8 @@ function Products() {
           ...value,
           // Fixed: Use climate field as the primary category field
           categorys: value.climate || value.categorys || value.category || 'Unspecified',
-          imageUrl: value.imageUrl || logo
+          // Ensure imageUrl is properly handled
+          imageUrl: value.imageUrl || defaultProductImage
         }));
         console.log('Fetched Products:', loadedProducts);
         console.log('Categories found:', [...new Set(loadedProducts.map(p => p.categorys))]);
@@ -351,7 +375,7 @@ function Products() {
   const sendWhatsAppMessage = (orderData) => {
   // Use a simple string concatenation to avoid pattern detection
   const countryCode = "91";
-  const mobileNumber = "9080533427";
+  const mobileNumber = "9597413148";
   const phoneNumber = countryCode + mobileNumber;
   
   let message = `New Order Received!\n\nToken No.: ${orderData.tokenNumber}\nInvoice No.: ${orderData.invoiceNumber}\nCustomer: ${orderData.userName}\nPhone: ${orderData.userPhone}\nAddress: ${orderData.userAddress}\nCity: ${orderData.userCity}\nStatus: ${orderData.status}\nTotal Amount: ₹${orderData.totalAmount.toFixed(2)}\n\nItems:\n${orderData.cart.map(item => `${item.productName} - Qty: ${item.quantity} - ₹${(item.ourPrice * item.quantity).toFixed(2)}`).join('\n')}\n\nNote: Please share the downloaded PDF invoice along with this message.`;
@@ -574,13 +598,13 @@ function Products() {
         <meta name="description" content="Browse our wide selection of high-quality crackers for all occasions. Filter by climate, search for specific products, and easily manage your cart." />
         <meta property="og:title" content="Udhayam Crackers - Product Catalog" />
         <meta property="og:description" content="Explore our diverse range of crackers. From morning to night, fancy to gift boxes, we have it all. Shop now for the best deals!" />
-        <meta property="og:image" content={logo} />
+        <meta property="og:image" content={defaultProductImage} />
         <meta property="og:url" content="https://www.udhayamcrackers.com/products" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Udhayam Crackers - Product Catalog" />
         <meta name="twitter:description" content="Discover our extensive range of crackers for all your celebration needs. Easy filtering and search options available." />
-        <meta name="twitter:image" content={logo} />
+        <meta name="twitter:image" content={defaultProductImage} />
         <meta name="keywords" content="crackers, fireworks, Diwali, celebration, morning crackers, night crackers, fancy crackers, gift boxes" />
         <meta name="author" content="Udhayam Crackers" />
         <meta name="robots" content="index, follow" />
@@ -601,7 +625,7 @@ function Products() {
                     "position": ${index + 1},
                     "name": "${product.productName || 'N/A'}",
                     "description": "${product.productName || 'N/A'} - ${product.categorys || 'Unspecified'} climate cracker",
-                    "image": "${product.imageUrl || logo}",
+                    "image": "${getImageUrl(product)}",
                     "offers": {
                       "@type": "Offer",
                       "price": "${product.ourPrice || 0}",
@@ -676,12 +700,9 @@ function Products() {
                             <td data-label="Preview">
                               <img
                                 className='product-image'
-                                src={product.imageUrl && product.imageUrl !== '' ? product.imageUrl : logo}
+                                src={getImageUrl(product)}
                                 alt={product.productName || 'Product'}
-                                onError={(e) => {
-                                  console.error(`Failed to load image for ${product.productName}: ${e.target.src}`);
-                                  e.target.src = logo;
-                                }}
+                                onError={(e) => handleImageError(e, product)}
                               />
                             </td>
                             <td data-label="No.">{currentIndex}</td>
