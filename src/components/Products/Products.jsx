@@ -216,12 +216,12 @@ function Products() {
 
     doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
-    doc.text("MAHITHRAA SRI CRACKERS", 105, 20, { align: "center" });
+    doc.text("UDHAYAM CRACKERS", 105, 20, { align: "center" });
 
     doc.setFontSize(10);
-    doc.text("Vanamoorthilingapuram,", 105, 30, { align: "center" });
+    doc.text("Sankarankovil Main Road,", 105, 30, { align: "center" });
     doc.text("Madathupatti, Sivakasi - 626123", 105, 35, { align: "center" });
-    doc.text("Phone no.: +919080533427 & +918110087349", 105, 40, { align: "center" });
+    doc.text("Phone no.: +919597413148", 105, 40, { align: "center" });
 
     if (img.complete && img.naturalWidth !== 0) {
       doc.addImage(qrCodeImage, 'WEBP', 150, 50, 40, 40);
