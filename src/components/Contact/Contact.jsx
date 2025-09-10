@@ -109,7 +109,7 @@ const Contact = () => {
             We request our customers to select your products on the Estimate Page to see your estimation and submit the required crackers through the Get Estimate Button. We will contact you within 2 hours and confirm the order through a phone call.
           </p>
           <p className="mb-4">
-            Please add and submit your enquiries and enjoy your Diwali with Methagu Crackers. Methagu Crackers is a shop following 100% legal & statutory compliances, and all our shops and go-downs are maintained as per the Explosives Acts.
+            Please add and submit your enquiries and enjoy your Diwali with Udhayam Crackers. Udhayam Crackers is a shop following 100% legal & statutory compliances, and all our shops and go-downs are maintained as per the Explosives Acts.
           </p>
           <p className="mb-4">
             Our License Name: xxx <br />
