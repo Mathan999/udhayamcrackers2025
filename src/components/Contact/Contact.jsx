@@ -1,7 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
 import { Phone, MessageCircle } from 'lucide-react';
-import './Contact.css';
 
 const Contact = () => {
   const phoneNumber = "+919597413148";
@@ -18,7 +17,7 @@ const Contact = () => {
   };
 
   return (
-    <div className="contact-container">
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center py-8 px-4">
       <Helmet>
         {/* Basic meta tags */}
         <title>Contact UDHAYAM CRACKERS - Get in Touch</title>
@@ -82,25 +81,44 @@ const Contact = () => {
         </script>
       </Helmet>
 
-      <div className="button-container">
-        <button
-          onClick={openWhatsApp}
-          className="contact-button whatsapp"
-        >
-          <div className="icon-container whatsapp">
-            <MessageCircle size={30} color="white" />
-          </div>
-          <span>WhatsApp</span>
-        </button>
-        <a
-          href={`tel:${phoneNumber}`}
-          className="contact-button phone"
-        >
-          <div className="icon-container phone">
-            <Phone size={30} color="white" />
-          </div>
-          <span>Phone</span>
-        </a>
+      <div className="max-w-3xl w-full bg-white shadow-lg rounded-lg p-6 md:p-8">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Contact UDHAYAM CRACKERS</h1>
+        
+        <div className="flex flex-col md:flex-row justify-center gap-4 mb-8">
+          <button
+            onClick={openWhatsApp}
+            className="flex items-center justify-center gap-2 bg-green-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-600 transition duration-300"
+          >
+            <MessageCircle size={24} />
+            <span>WhatsApp</span>
+          </button>
+          <a
+            href={`tel:${phoneNumber}`}
+            className="flex items-center justify-center gap-2 bg-blue-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-600 transition duration-300"
+          >
+            <Phone size={24} />
+            <span>Phone</span>
+          </a>
+        </div>
+
+        <div className="text-gray-700 text-base md:text-lg leading-relaxed">
+          <p className="mb-4">
+            As per the 2018 Supreme Court Order, Online Sale of Firecrackers are NOT permitted. We value our customers and at the same time, we respect the jurisdiction.
+          </p>
+          <p className="mb-4">
+            We request our customers to select your products on the Estimate Page to see your estimation and submit the required crackers through the Get Estimate Button. We will contact you within 2 hours and confirm the order through a phone call.
+          </p>
+          <p className="mb-4">
+            Please add and submit your enquiries and enjoy your Diwali with Methagu Crackers. Methagu Crackers is a shop following 100% legal & statutory compliances, and all our shops and go-downs are maintained as per the Explosives Acts.
+          </p>
+          <p className="mb-4">
+            Our License Name: xxx <br />
+            Licence No: x/xxxx
+          </p>
+          <p>
+            We send the parcels through registered and legal transport service providers, as is standard practice among major companies in Sivakasi.
+          </p>
+        </div>
       </div>
     </div>
   );
