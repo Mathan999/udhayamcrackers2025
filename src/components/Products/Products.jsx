@@ -221,7 +221,7 @@ function Products() {
     doc.setFontSize(10);
     doc.text("Sankarankovil Main Road,", 105, 30, { align: "center" });
     doc.text("Madathupatti, Sivakasi - 626123", 105, 35, { align: "center" });
-    doc.text("Phone no.: +919597413148", 105, 40, { align: "center" });
+    doc.text("Phone no.: +919597413148 & +919952555514", 105, 40, { align: "center" });
 
     if (img.complete && img.naturalWidth !== 0) {
       doc.addImage(qrCodeImage, 'WEBP', 150, 50, 40, 40);
@@ -230,7 +230,7 @@ function Products() {
     }
 
     doc.setFontSize(10);
-    doc.text("UPI id: sankarguru81100@oksbi", 150, 95);
+    doc.text("UPI id: @oksbi", 150, 95);
 
     doc.setFontSize(14);
     doc.text("Tax Invoice", 20, 50);
@@ -594,7 +594,7 @@ function Products() {
   return (
     <div className="products">
       <Helmet>
-        <title> UDHAYAM CRACKERS - Diwali Special Offers 2024</title>
+        <title> UDHAYAM CRACKERS - Diwali Special Offers 2025</title>
         <meta name="description" content="Browse our wide selection of high-quality crackers for all occasions. Filter by climate, search for specific products, and easily manage your cart." />
         <meta property="og:title" content="Udhayam Crackers - Product Catalog" />
         <meta property="og:description" content="Explore our diverse range of crackers. From morning to night, fancy to gift boxes, we have it all. Shop now for the best deals!" />
