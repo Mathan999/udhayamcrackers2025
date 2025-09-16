@@ -6,8 +6,8 @@ import { Plus, Minus, Loader2, CheckCircle, Download } from "lucide-react";
 import { jsPDF } from "jspdf";
 import "./Products.css";
 
-// Use absolute paths for assets in the public folder
-const qrCodeImage = '../assets/qr_code.webp'; // Adjust the path as necessary
+// Use Cloudinary URL for QR code image
+const qrCodeImage = 'https://res.cloudinary.com/dirbsbdfh/image/upload/v1758038640/1000252086_h7oufe.jpg'; // Replace with your actual Cloudinary URL
 const defaultProductImage = '../assets/logo_1x1.png'; // Default image path
 
 function Products() {
@@ -210,10 +210,45 @@ function Products() {
     const doc = new jsPDF();
     doc.setFont("helvetica", "normal");
 
-    const img = new Image();
-    img.src = qrCodeImage;
-    img.onerror = () => console.error('Failed to load QR code image:', qrCodeImage);
+    // Create a function to load and add the QR code image
+    const loadAndAddQRCode = () => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous"; // Handle CORS for Cloudinary images
+        
+        img.onload = () => {
+          try {
+            // Convert image to canvas to ensure proper format for jsPDF
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            
+            // Convert canvas to base64 data URL
+            const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+            
+            // Add image to PDF
+            doc.addImage(dataURL, 'JPEG', 150, 50, 40, 40);
+            console.log('QR code image added successfully to PDF');
+            resolve();
+          } catch (error) {
+            console.error('Error processing QR code image:', error);
+            resolve(); // Continue without image
+          }
+        };
 
+        img.onerror = (error) => {
+          console.error('Failed to load QR code image from Cloudinary:', error);
+          console.warn('QR code image not loaded, continuing without it');
+          resolve(); // Continue without image
+        };
+
+        img.src = qrCodeImage;
+      });
+    };
+
+    // Add PDF content
     doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
     doc.text("UDHAYAM CRACKERS", 105, 20, { align: "center" });
@@ -223,114 +258,114 @@ function Products() {
     doc.text("Madathupatti, Sivakasi - 626123", 105, 35, { align: "center" });
     doc.text("Phone no.: +919597413148 & +919952555514", 105, 40, { align: "center" });
 
-    if (img.complete && img.naturalWidth !== 0) {
-      doc.addImage(qrCodeImage, 'WEBP', 150, 50, 40, 40);
-    } else {
-      console.warn('QR code image not loaded, skipping in PDF');
-    }
+    // Try to load and add QR code image
+    loadAndAddQRCode().then(() => {
+      // Continue with rest of PDF generation
+      doc.setFontSize(10);
+      doc.text("UPI id: @oksbi", 150, 95);
 
-    doc.setFontSize(10);
-    doc.text("UPI id: @oksbi", 150, 95);
+      doc.setFontSize(14);
+      doc.text("Tax Invoice", 20, 50);
 
-    doc.setFontSize(14);
-    doc.text("Tax Invoice", 20, 50);
+      doc.setFontSize(10);
+      doc.text(`Invoice No.: ${orderData.invoiceNumber}`, 20, 60);
+      doc.text(`Token No.: ${orderData.tokenNumber}`, 20, 65);
+      doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, 20, 70);
+      doc.text(`Status: ${orderData.status}`, 20, 75);
 
-    doc.setFontSize(10);
-    doc.text(`Invoice No.: ${orderData.invoiceNumber}`, 20, 60);
-    doc.text(`Token No.: ${orderData.tokenNumber}`, 20, 65);
-    doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, 20, 70);
-    doc.text(`Status: ${orderData.status}`, 20, 75);
+      doc.text("Bill To:", 20, 85);
+      doc.text(`${orderData.userName || 'N/A'}`, 20, 90);
+      doc.text(`${orderData.userAddress || 'N/A'}`, 20, 95);
+      doc.text(`${orderData.userCity || 'N/A'}`, 20, 100);
+      doc.text(`Phone: ${orderData.userPhone || 'N/A'}`, 20, 105);
 
-    doc.text("Bill To:", 20, 85);
-    doc.text(`${orderData.userName || 'N/A'}`, 20, 90);
-    doc.text(`${orderData.userAddress || 'N/A'}`, 20, 95);
-    doc.text(`${orderData.userCity || 'N/A'}`, 20, 100);
-    doc.text(`Phone: ${orderData.userPhone || 'N/A'}`, 20, 105);
+      const sortAndGroupCartItems = (cart) => {
+        const categoryOrder = categories;
+        const groupedItems = cart.reduce((acc, item) => {
+          const category = item.categorys || 'Unspecified';
+          if (!acc[category]) {
+            acc[category] = [];
+          }
+          acc[category].push(item);
+          return acc;
+        }, {});
 
-    const sortAndGroupCartItems = (cart) => {
-      const categoryOrder = categories;
-      const groupedItems = cart.reduce((acc, item) => {
-        const category = item.categorys || 'Unspecified';
-        if (!acc[category]) {
-          acc[category] = [];
-        }
-        acc[category].push(item);
-        return acc;
-      }, {});
+        const sortedCategories = Object.keys(groupedItems).sort((a, b) =>
+          categoryOrder.indexOf(a) - categoryOrder.indexOf(b)
+        );
 
-      const sortedCategories = Object.keys(groupedItems).sort((a, b) =>
-        categoryOrder.indexOf(a) - categoryOrder.indexOf(b)
-      );
+        return sortedCategories.flatMap(category => groupedItems[category]);
+      };
 
-      return sortedCategories.flatMap(category => groupedItems[category]);
-    };
+      const sortedCartItems = sortAndGroupCartItems(orderData.cart || []);
 
-    const sortedCartItems = sortAndGroupCartItems(orderData.cart || []);
-
-    let yPos = 115;
-    doc.setFillColor(240, 240, 240);
-    doc.rect(10, yPos, 190, 10, "F");
-    doc.setTextColor(0, 0, 0);
-    doc.text("S.No", 12, yPos + 7);
-    doc.text("Item name", 25, yPos + 7);
-    doc.text("HSN/SAC", 85, yPos + 7);
-    doc.text("Qty", 110, yPos + 7);
-    doc.text("Price/unit", 130, yPos + 7);
-    doc.text("Amount", 170, yPos + 7);
-
-    yPos += 10;
-    let currentCategory = null;
-
-    sortedCartItems.forEach((item, index) => {
-      if (item.categorys !== currentCategory) {
-        currentCategory = item.categorys;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.text(currentCategory || 'Unspecified', 25, yPos + 7);
-        yPos += 10;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-      }
-
-      doc.text((index + 1).toString(), 13, yPos + 7);
-      doc.text(item.productName.length > 30 ? item.productName.substring(0, 30) + "..." : item.productName, 25, yPos + 7);
-      doc.text("-", 90, yPos + 7);
-      doc.text(item.quantity.toString(), 112, yPos + 7);
-
-      const price = Number(item.ourPrice) || 0;
-      doc.text(`${price.toFixed(2)}`, 135, yPos + 7);
-
-      const totalAmount = price * item.quantity;
-      doc.text(`${totalAmount.toFixed(2)}`, 175, yPos + 7);
+      let yPos = 115;
+      doc.setFillColor(240, 240, 240);
+      doc.rect(10, yPos, 190, 10, "F");
+      doc.setTextColor(0, 0, 0);
+      doc.text("S.No", 12, yPos + 7);
+      doc.text("Item name", 25, yPos + 7);
+      doc.text("HSN/SAC", 85, yPos + 7);
+      doc.text("Qty", 110, yPos + 7);
+      doc.text("Price/unit", 130, yPos + 7);
+      doc.text("Amount", 170, yPos + 7);
 
       yPos += 10;
+      let currentCategory = null;
 
-      if (yPos > 250) {
-        doc.addPage();
-        yPos = 20;
-      }
+      sortedCartItems.forEach((item, index) => {
+        if (item.categorys !== currentCategory) {
+          currentCategory = item.categorys;
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(12);
+          doc.text(currentCategory || 'Unspecified', 25, yPos + 7);
+          yPos += 10;
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+        }
+
+        doc.text((index + 1).toString(), 13, yPos + 7);
+        doc.text(item.productName.length > 30 ? item.productName.substring(0, 30) + "..." : item.productName, 25, yPos + 7);
+        doc.text("-", 90, yPos + 7);
+        doc.text(item.quantity.toString(), 112, yPos + 7);
+
+        const price = Number(item.ourPrice) || 0;
+        doc.text(`${price.toFixed(2)}`, 135, yPos + 7);
+
+        const totalAmount = price * item.quantity;
+        doc.text(`${totalAmount.toFixed(2)}`, 175, yPos + 7);
+
+        yPos += 10;
+
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 20;
+        }
+      });
+
+      yPos += 10;
+      doc.line(10, yPos, 200, yPos);
+      doc.text("Subtotal", 130, yPos + 7);
+      doc.text(`${parseFloat(orderData.totalAmount || 0).toFixed(2)}`, 175, yPos + 7);
+
+      yPos += 10;
+      doc.setFont("helvetica", "bold");
+      doc.text("Total", 130, yPos + 7);
+      doc.text(`${parseFloat(orderData.totalAmount || 0).toFixed(2)}`, 175, yPos + 7);
+
+      yPos += 20;
+      doc.setFont("helvetica", "normal");
+      doc.text("INVOICE AMOUNT IN WORDS", 20, yPos);
+      doc.setFont("helvetica", "bold");
+      const amountInWords = `${numberToWords(Math.floor(orderData.totalAmount || 0))} Rupees and ${numberToWords(Math.round(((orderData.totalAmount || 0) % 1) * 100))} Paise Only`;
+      doc.text(amountInWords, 20, yPos + 7);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.text("THANK YOU VISIT AGAIN", 105, 280, { align: "center" });
+    }).catch((error) => {
+      console.error('Error in PDF generation:', error);
     });
-
-    yPos += 10;
-    doc.line(10, yPos, 200, yPos);
-    doc.text("Subtotal", 130, yPos + 7);
-    doc.text(`${parseFloat(orderData.totalAmount || 0).toFixed(2)}`, 175, yPos + 7);
-
-    yPos += 10;
-    doc.setFont("helvetica", "bold");
-    doc.text("Total", 130, yPos + 7);
-    doc.text(`${parseFloat(orderData.totalAmount || 0).toFixed(2)}`, 175, yPos + 7);
-
-    yPos += 20;
-    doc.setFont("helvetica", "normal");
-    doc.text("INVOICE AMOUNT IN WORDS", 20, yPos);
-    doc.setFont("helvetica", "bold");
-    const amountInWords = `${numberToWords(Math.floor(orderData.totalAmount || 0))} Rupees and ${numberToWords(Math.round(((orderData.totalAmount || 0) % 1) * 100))} Paise Only`;
-    doc.text(amountInWords, 20, yPos + 7);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.text("THANK YOU VISIT AGAIN", 105, 280, { align: "center" });
 
     return doc;
   };
