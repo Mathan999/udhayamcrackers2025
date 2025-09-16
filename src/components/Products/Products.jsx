@@ -262,7 +262,7 @@ function Products() {
     loadAndAddQRCode().then(() => {
       // Continue with rest of PDF generation
       doc.setFontSize(10);
-      doc.text("UPI id: @oksbi", 150, 95);
+      doc.text("UPI id: muthukumarm380@oksbi", 150, 95);
 
       doc.setFontSize(14);
       doc.text("Tax Invoice", 20, 50);
