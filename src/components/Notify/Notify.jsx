@@ -1,7 +1,7 @@
 import React from 'react';
 
 const Notify = () => {
-  const notificationText = "Diwali Offers 2024! Up to 50% off. Fast delivery. All types of fancy crackers & gift boxes available.";
+  const notificationText = "Diwali Offers 2025! Up to 50% off. Fast delivery. All types of fancy crackers & gift boxes available.";
 
   return (
     <div className="bg-[#b80d02] overflow-hidden py-2 relative">
