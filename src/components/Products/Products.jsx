@@ -205,137 +205,139 @@ function Products() {
     setPdfDownloaded(false);
     setShowWhatsAppButton(false);
   };
-const generatePDF = (orderData) => {
-  const doc = new jsPDF();
-  doc.setFont("helvetica", "normal");
 
-  // Header
-  doc.setFontSize(18);
-  doc.setTextColor(0, 0, 0);
-  doc.text("UDHAYAM CRACKERS", 105, 20, { align: "center" });
+  const generatePDF = (orderData) => {
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "normal");
 
-  doc.setFontSize(10);
-  doc.text("Sankarankovil Main Road,", 105, 30, { align: "center" });
-  doc.text("Madathupatti, Sivakasi - 626123", 105, 35, { align: "center" });
-  doc.text("Phone no.: +919597413148 & +919952555514", 105, 40, { align: "center" });
+    // Header
+    doc.setFontSize(18);
+    doc.setTextColor(0, 0, 0);
+    doc.text("UDHAYAM CRACKERS", 105, 20, { align: "center" });
 
-  // Add QR Code directly from Cloudinary URL
-  try {
-    doc.addImage(qrCodeImage, 'JPEG', 150, 50, 40, 40);
-    console.log('QR code added to PDF');
-  } catch (error) {
-    console.error('Error adding QR code:', error);
-  }
+    doc.setFontSize(10);
+    doc.text("Sankarankovil Main Road,", 105, 30, { align: "center" });
+    doc.text("Madathupatti, Sivakasi - 626123", 105, 35, { align: "center" });
+    doc.text("Phone no.: +919597413148 & +919952555514", 105, 40, { align: "center" });
 
-  doc.setFontSize(10);
-  doc.text("UPI id: muthukumarm@oksbi", 150, 95);
-
-  doc.setFontSize(14);
-  doc.text("Tax Invoice", 20, 50);
-
-  doc.setFontSize(10);
-  doc.text(`Invoice No.: ${orderData.invoiceNumber}`, 20, 60);
-  doc.text(`Token No.: ${orderData.tokenNumber}`, 20, 65);
-  doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, 20, 70);
-  doc.text(`Status: ${orderData.status}`, 20, 75);
-
-  doc.text("Bill To:", 20, 85);
-  doc.text(`${orderData.userName || 'N/A'}`, 20, 90);
-  doc.text(`${orderData.userAddress || 'N/A'}`, 20, 95);
-  doc.text(`${orderData.userCity || 'N/A'}`, 20, 100);
-  doc.text(`Phone: ${orderData.userPhone || 'N/A'}`, 20, 105);
-
-  const sortAndGroupCartItems = (cart) => {
-    const categoryOrder = categories;
-    const groupedItems = cart.reduce((acc, item) => {
-      const category = item.categorys || 'Unspecified';
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(item);
-      return acc;
-    }, {});
-
-    const sortedCategories = Object.keys(groupedItems).sort((a, b) =>
-      categoryOrder.indexOf(a) - categoryOrder.indexOf(b)
-    );
-
-    return sortedCategories.flatMap(category => groupedItems[category]);
-  };
-
-  const sortedCartItems = sortAndGroupCartItems(orderData.cart || []);
-
-  let yPos = 115;
-  doc.setFillColor(240, 240, 240);
-  doc.rect(10, yPos, 190, 10, "F");
-  doc.setTextColor(0, 0, 0);
-  doc.text("S.No", 12, yPos + 7);
-  doc.text("Item name", 25, yPos + 7);
-  doc.text("HSN/SAC", 85, yPos + 7);
-  doc.text("Qty", 110, yPos + 7);
-  doc.text("Price/unit", 130, yPos + 7);
-  doc.text("Amount", 170, yPos + 7);
-
-  yPos += 10;
-  let currentCategory = null;
-  let itemIndex = 1;
-
-  sortedCartItems.forEach((item) => {
-    if (item.categorys !== currentCategory) {
-      currentCategory = item.categorys;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(currentCategory || 'Unspecified', 25, yPos + 7);
-      yPos += 10;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
+    // Add QR Code directly from Cloudinary URL
+    try {
+      doc.addImage(qrCodeImage, 'JPEG', 150, 50, 40, 40);
+      console.log('QR code added to PDF');
+    } catch (error) {
+      console.error('Error adding QR code:', error);
     }
 
-    doc.text(itemIndex.toString(), 13, yPos + 7);
-    doc.text(item.productName && item.productName.length > 30 ? 
-      item.productName.substring(0, 30) + "..." : 
-      item.productName || 'Unknown Product', 25, yPos + 7);
-    doc.text("-", 90, yPos + 7);
-    doc.text((item.quantity || 0).toString(), 112, yPos + 7);
+    doc.setFontSize(10);
+    doc.text("UPI id: muthukumarm@oksbi", 150, 95);
 
-    const price = Number(item.ourPrice) || 0;
-    doc.text(`${price.toFixed(2)}`, 135, yPos + 7);
+    doc.setFontSize(14);
+    doc.text("Tax Invoice", 20, 50);
 
-    const totalAmount = price * (item.quantity || 0);
-    doc.text(`${totalAmount.toFixed(2)}`, 175, yPos + 7);
+    doc.setFontSize(10);
+    doc.text(`Invoice No.: ${orderData.invoiceNumber}`, 20, 60);
+    doc.text(`Token No.: ${orderData.tokenNumber}`, 20, 65);
+    doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, 20, 70);
+    doc.text(`Status: ${orderData.status}`, 20, 75);
+
+    doc.text("Bill To:", 20, 85);
+    doc.text(`${orderData.userName || 'N/A'}`, 20, 90);
+    doc.text(`${orderData.userAddress || 'N/A'}`, 20, 95);
+    doc.text(`${orderData.userCity || 'N/A'}`, 20, 100);
+    doc.text(`Phone: ${orderData.userPhone || 'N/A'}`, 20, 105);
+
+    const sortAndGroupCartItems = (cart) => {
+      const categoryOrder = categories;
+      const groupedItems = cart.reduce((acc, item) => {
+        const category = item.categorys || 'Unspecified';
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(item);
+        return acc;
+      }, {});
+
+      const sortedCategories = Object.keys(groupedItems).sort((a, b) =>
+        categoryOrder.indexOf(a) - categoryOrder.indexOf(b)
+      );
+
+      return sortedCategories.flatMap(category => groupedItems[category]);
+    };
+
+    const sortedCartItems = sortAndGroupCartItems(orderData.cart || []);
+
+    let yPos = 115;
+    doc.setFillColor(240, 240, 240);
+    doc.rect(10, yPos, 190, 10, "F");
+    doc.setTextColor(0, 0, 0);
+    doc.text("S.No", 12, yPos + 7);
+    doc.text("Item name", 25, yPos + 7);
+    doc.text("HSN/SAC", 85, yPos + 7);
+    doc.text("Qty", 110, yPos + 7);
+    doc.text("Price/unit", 130, yPos + 7);
+    doc.text("Amount", 170, yPos + 7);
 
     yPos += 10;
-    itemIndex++;
+    let currentCategory = null;
+    let itemIndex = 1;
 
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = 20;
-    }
-  });
+    sortedCartItems.forEach((item) => {
+      if (item.categorys !== currentCategory) {
+        currentCategory = item.categorys;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text(currentCategory || 'Unspecified', 25, yPos + 7);
+        yPos += 10;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+      }
 
-  yPos += 10;
-  doc.line(10, yPos, 200, yPos);
-  doc.text("Subtotal", 130, yPos + 7);
-  doc.text(`${parseFloat(orderData.totalAmount || 0).toFixed(2)}`, 175, yPos + 7);
+      doc.text(itemIndex.toString(), 13, yPos + 7);
+      doc.text(item.productName && item.productName.length > 30 ? 
+        item.productName.substring(0, 30) + "..." : 
+        item.productName || 'Unknown Product', 25, yPos + 7);
+      doc.text("-", 90, yPos + 7);
+      doc.text((item.quantity || 0).toString(), 112, yPos + 7);
 
-  yPos += 10;
-  doc.setFont("helvetica", "bold");
-  doc.text("Total", 130, yPos + 7);
-  doc.text(`${parseFloat(orderData.totalAmount || 0).toFixed(2)}`, 175, yPos + 7);
+      const price = Number(item.ourPrice) || 0;
+      doc.text(`${price.toFixed(2)}`, 135, yPos + 7);
 
-  yPos += 20;
-  doc.setFont("helvetica", "normal");
-  doc.text("INVOICE AMOUNT IN WORDS", 20, yPos);
-  doc.setFont("helvetica", "bold");
-  const amountInWords = `${numberToWords(Math.floor(orderData.totalAmount || 0))} Rupees and ${numberToWords(Math.round(((orderData.totalAmount || 0) % 1) * 100))} Paise Only`;
-  doc.text(amountInWords, 20, yPos + 7);
+      const totalAmount = price * (item.quantity || 0);
+      doc.text(`${totalAmount.toFixed(2)}`, 175, yPos + 7);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-  doc.text("THANK YOU VISIT AGAIN", 105, 280, { align: "center" });
+      yPos += 10;
+      itemIndex++;
 
-  return doc;
-};
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+    });
+
+    yPos += 10;
+    doc.line(10, yPos, 200, yPos);
+    doc.text("Subtotal", 130, yPos + 7);
+    doc.text(`${parseFloat(orderData.totalAmount || 0).toFixed(2)}`, 175, yPos + 7);
+
+    yPos += 10;
+    doc.setFont("helvetica", "bold");
+    doc.text("Total", 130, yPos + 7);
+    doc.text(`${parseFloat(orderData.totalAmount || 0).toFixed(2)}`, 175, yPos + 7);
+
+    yPos += 20;
+    doc.setFont("helvetica", "normal");
+    doc.text("INVOICE AMOUNT IN WORDS", 20, yPos);
+    doc.setFont("helvetica", "bold");
+    const amountInWords = `${numberToWords(Math.floor(orderData.totalAmount || 0))} Rupees and ${numberToWords(Math.round(((orderData.totalAmount || 0) % 1) * 100))} Paise Only`;
+    doc.text(amountInWords, 20, yPos + 7);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.text("THANK YOU VISIT AGAIN", 105, 280, { align: "center" });
+
+    return doc;
+  };
+
   const numberToWords = (num) => {
     const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
     const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
@@ -374,35 +376,35 @@ const generatePDF = (orderData) => {
   };
 
   const sendWhatsAppMessage = (orderData) => {
-  // Use a simple string concatenation to avoid pattern detection
-  const countryCode = "91";
-  const mobileNumber = "9597413148";
-  const phoneNumber = countryCode + mobileNumber;
-  
-  let message = `New Order Received!\n\nToken No.: ${orderData.tokenNumber}\nInvoice No.: ${orderData.invoiceNumber}\nCustomer: ${orderData.userName}\nPhone: ${orderData.userPhone}\nAddress: ${orderData.userAddress}\nCity: ${orderData.userCity}\nStatus: ${orderData.status}\nTotal Amount: ₹${orderData.totalAmount.toFixed(2)}\n\nItems:\n${orderData.cart.map(item => `${item.productName} - Qty: ${item.quantity} - ₹${(item.ourPrice * item.quantity).toFixed(2)}`).join('\n')}\n\nNote: Please share the downloaded PDF invoice along with this message.`;
-  
-  if (message.length > 4000) {
-    message = message.substring(0, 3990) + "...";
-  }
+    // Use a simple string concatenation to avoid pattern detection
+    const countryCode = "91";
+    const mobileNumber = "9597413148";
+    const phoneNumber = countryCode + mobileNumber;
+    
+    let message = `New Order Received!\n\nToken No.: ${orderData.tokenNumber}\nInvoice No.: ${orderData.invoiceNumber}\nCustomer: ${orderData.userName}\nPhone: ${orderData.userPhone}\nAddress: ${orderData.userAddress}\nCity: ${orderData.userCity}\nStatus: ${orderData.status}\nTotal Amount: ₹${orderData.totalAmount.toFixed(2)}\n\nItems:\n${orderData.cart.map(item => `${item.productName} - Qty: ${item.quantity} - ₹${(item.ourPrice * item.quantity).toFixed(2)}`).join('\n')}\n\nNote: Please share the downloaded PDF invoice along with this message.`;
+    
+    if (message.length > 4000) {
+      message = message.substring(0, 3990) + "...";
+    }
 
-  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-  
-  try {
-    const whatsappLink = document.createElement('a');
-    whatsappLink.href = whatsappUrl;
-    whatsappLink.target = '_blank';
-    document.body.appendChild(whatsappLink);
-    whatsappLink.click();
-    document.body.removeChild(whatsappLink);
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    
+    try {
+      const whatsappLink = document.createElement('a');
+      whatsappLink.href = whatsappUrl;
+      whatsappLink.target = '_blank';
+      document.body.appendChild(whatsappLink);
+      whatsappLink.click();
+      document.body.removeChild(whatsappLink);
 
-    alert("WhatsApp opened successfully! Please attach the downloaded PDF invoice to the chat and send it along with the order details.");
-    return true;
-  } catch (error) {
-    console.error("Error opening WhatsApp:", error);
-    alert("Failed to open WhatsApp. Please ensure WhatsApp is installed and try again, or manually contact +919080533427 with your order details and the downloaded PDF.");
-    return false;
-  }
-};
+      alert("WhatsApp opened successfully! Please attach the downloaded PDF invoice to the chat and send it along with the order details.");
+      return true;
+    } catch (error) {
+      console.error("Error opening WhatsApp:", error);
+      alert("Failed to open WhatsApp. Please ensure WhatsApp is installed and try again, or manually contact +919080533427 with your order details and the downloaded PDF.");
+      return false;
+    }
+  };
 
   const handlePurchase = async (orderData) => {
     if (cart.length === 0) {
@@ -423,7 +425,7 @@ const generatePDF = (orderData) => {
       ...orderData,
       orderDate: new Date().toISOString(),
       invoiceNumber: newInvoiceNumber,
-      tokenNumber: newTokenNumber,
+      tokenNumber: newTokenNumber.toString(), // Ensure tokenNumber is a string
       status: 'Pending',
       pdfDownloaded: false
     };
@@ -442,7 +444,7 @@ const generatePDF = (orderData) => {
         address: fullOrderData.userAddress,
         city: fullOrderData.userCity,
         phone: fullOrderData.userPhone,
-        tokenNumber: newTokenNumber,
+        tokenNumber: newTokenNumber.toString(), // Ensure tokenNumber is a string
         invoiceNumber: newInvoiceNumber,
         status: fullOrderData.status,
         orderDate: fullOrderData.orderDate,
