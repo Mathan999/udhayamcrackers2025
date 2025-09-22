@@ -4,14 +4,13 @@ import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCTYWrF20kn1_SDsYrtDQir0GkUbQ19_xQ",
-  authDomain: "udhayamcracker.firebaseapp.com",
-  databaseURL: "https://udhayamcracker-default-rtdb.firebaseio.com",
-  projectId: "udhayamcracker",
-  storageBucket: "udhayamcracker.appspot.com",
-  messagingSenderId: "988190074194",
-  appId: "1:988190074194:web:062dc413ed31ea0999068b",
-  measurementId: "G-XHNE1RW2Y8"
+ apiKey: "AIzaSyC8HzYSR1cN3JXTzpxSMakh_8KviOgYQLo",
+  authDomain: "udhayamcrackers-4dce4.firebaseapp.com",
+  projectId: "udhayamcrackers-4dce4",
+  storageBucket: "udhayamcrackers-4dce4.firebasestorage.app",
+  messagingSenderId: "1085906446955",
+  appId: "1:1085906446955:web:dc26f7418beeb072595f2e",
+  measurementId: "G-68DNVPWL2X"
 };
 
 const app = initializeApp(firebaseConfig);
