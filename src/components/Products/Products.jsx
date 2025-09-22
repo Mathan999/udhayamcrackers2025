@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
-import { ref, onValue, get, set, push, off } from "firebase/database";
+import { ref, onValue, get, set, off } from "firebase/database";
 import { database } from "../firebase";
+import { collection, addDoc } from "firebase/firestore";
+import { firestore } from "../firebase"; // Import Firestore
 import { Plus, Minus, Loader2, CheckCircle, Download } from "lucide-react";
 import { jsPDF } from "jspdf";
 import "./Products.css";
 
 // Use Cloudinary URL for QR code image
-const qrCodeImage = 'https://res.cloudinary.com/dirbsbdfh/image/upload/v1758038640/1000252086_h7oufe.jpg'; // Replace with your actual Cloudinary URL
-const defaultProductImage = '../assets/logo_1x1.png'; // Default image path
+const qrCodeImage = 'https://res.cloudinary.com/dirbsbdfh/image/upload/v1758038640/1000252086_h7oufe.jpg';
+const defaultProductImage = '../assets/logo_1x1.png';
 
 function Products() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,56 +34,49 @@ function Products() {
   const [pdfDownloaded, setPdfDownloaded] = useState(false);
   const [showWhatsAppButton, setShowWhatsAppButton] = useState(false);
 
-  // Updated categories to match your Firebase data
   const categories = [
-  "ELECTRIC CRACKERS", 
-  "CHORSA & GAINT CRACKERS", 
-  "DELUXE CRACKERS", 
-  "WALA CRACKERS", 
-  "BIJILI", 
-  "PAPER BOMBS (ADIYAL)", 
-  "BOMBS",
-  "PEACOCK SPECIAL",
-  "FLOWER POTS", 
-  "GROUND CHAKKAR", 
-  "TWINKLING STAR", 
-  "KIDS SPECIAL - 1", 
-  "NEW COLLECTION - 2025", 
-  "FRUITS SHOWER", 
-  "CANDLE SPECIAL", 
-  "MULTI NEW VARIETIES", 
-  "KUTIES FUN", 
-  "SKY ROCKETS", 
-  "MATCHE BOXS", 
- "MULTI COLOUR SINGLE SHOTS",
-  "MULTI COLOUR PIPE SHOTS",
-  "DAY SPECIAL FANCY",
-  "MULTI COLOUR LONG SHOTS",
-  "10 CM SPARKLERS",
-  "12 CM SPARKLERS",
-  "15 CM SPARKLERS",
-  "30 CM SPARKLERS", 
-  "50 SPARKLERS", 
-];
+    "ELECTRIC CRACKERS", 
+    "CHORSA & GAINT CRACKERS", 
+    "DELUXE CRACKERS", 
+    "WALA CRACKERS", 
+    "BIJILI", 
+    "PAPER BOMBS (ADIYAL)", 
+    "BOMBS",
+    "PEACOCK SPECIAL",
+    "FLOWER POTS", 
+    "GROUND CHAKKAR", 
+    "TWINKLING STAR", 
+    "KIDS SPECIAL - 1", 
+    "NEW COLLECTION - 2025", 
+    "FRUITS SHOWER", 
+    "CANDLE SPECIAL", 
+    "MULTI NEW VARIETIES", 
+    "KUTIES FUN", 
+    "SKY ROCKETS", 
+    "MATCHE BOXS", 
+    "MULTI COLOUR SINGLE SHOTS",
+    "MULTI COLOUR PIPE SHOTS",
+    "DAY SPECIAL FANCY",
+    "MULTI COLOUR LONG SHOTS",
+    "10 CM SPARKLERS",
+    "12 CM SPARKLERS",
+    "15 CM SPARKLERS",
+    "30 CM SPARKLERS", 
+    "50 SPARKLERS", 
+  ];
 
-  // Function to get the correct image URL
   const getImageUrl = (product) => {
     if (product.imageUrl) {
-      // If it's a Cloudinary URL, use it directly
       if (product.imageUrl.includes('cloudinary.com') || product.imageUrl.startsWith('http')) {
         return product.imageUrl;
       }
-      // If it's a local path, use it directly
       return product.imageUrl;
     }
-    // Fallback to default image
     return defaultProductImage;
   };
 
-  // Function to handle image loading errors
   const handleImageError = (e, product) => {
     console.error(`Failed to load image for ${product.productName}: ${e.target.src}`);
-    // Try to use default image as fallback
     if (e.target.src !== defaultProductImage) {
       e.target.src = defaultProductImage;
     }
@@ -111,9 +106,7 @@ function Products() {
         const loadedProducts = Object.entries(data).map(([key, value]) => ({
           id: key,
           ...value,
-          // Fixed: Use climate field as the primary category field
           categorys: value.climate || value.categorys || value.category || 'Unspecified',
-          // Ensure imageUrl is properly handled
           imageUrl: value.imageUrl || defaultProductImage
         }));
         console.log('Fetched Products:', loadedProducts);
@@ -210,7 +203,6 @@ function Products() {
     const doc = new jsPDF();
     doc.setFont("helvetica", "normal");
 
-    // Header
     doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
     doc.text("UDHAYAM CRACKERS", 105, 20, { align: "center" });
@@ -220,7 +212,6 @@ function Products() {
     doc.text("Madathupatti, Sivakasi - 626123", 105, 35, { align: "center" });
     doc.text("Phone no.: +919597413148 & +919952555514", 105, 40, { align: "center" });
 
-    // Add QR Code directly from Cloudinary URL
     try {
       doc.addImage(qrCodeImage, 'JPEG', 150, 50, 40, 40);
       console.log('QR code added to PDF');
@@ -376,7 +367,6 @@ function Products() {
   };
 
   const sendWhatsAppMessage = (orderData) => {
-    // Use a simple string concatenation to avoid pattern detection
     const countryCode = "91";
     const mobileNumber = "9597413148";
     const phoneNumber = countryCode + mobileNumber;
@@ -425,26 +415,27 @@ function Products() {
       ...orderData,
       orderDate: new Date().toISOString(),
       invoiceNumber: newInvoiceNumber,
-      tokenNumber: newTokenNumber.toString(), // Ensure tokenNumber is a string
+      tokenNumber: newTokenNumber.toString(),
       status: 'Pending',
       pdfDownloaded: false
     };
 
-    const ordersRef = ref(database, 'orders');
-    const customerOrdersRef = ref(database, 'customerOrders');
     const invoiceCounterRef = ref(database, 'invoiceCounter');
     const tokenCounterRef = ref(database, 'tokenCounter');
 
     try {
-      // Save to both orders and customerOrders
-      await push(ordersRef, fullOrderData);
-      await push(customerOrdersRef, {
+      // Save to Firestore collections 'orders' and 'customerOrders'
+      const ordersCollection = collection(firestore, 'orders');
+      const customerOrdersCollection = collection(firestore, 'customerOrders');
+      
+      await addDoc(ordersCollection, fullOrderData);
+      await addDoc(customerOrdersCollection, {
         id: Date.now(),
         customer: fullOrderData.userName,
         address: fullOrderData.userAddress,
         city: fullOrderData.userCity,
         phone: fullOrderData.userPhone,
-        tokenNumber: newTokenNumber.toString(), // Ensure tokenNumber is a string
+        tokenNumber: newTokenNumber.toString(),
         invoiceNumber: newInvoiceNumber,
         status: fullOrderData.status,
         orderDate: fullOrderData.orderDate,
@@ -453,14 +444,13 @@ function Products() {
         cart: fullOrderData.cart
       });
       
-      // Update counters
+      // Update counters in Realtime Database
       await set(invoiceCounterRef, newInvoiceNumber);
       await set(tokenCounterRef, newTokenNumber);
       
       setLastInvoiceNumber(newInvoiceNumber);
       setLastTokenNumber(newTokenNumber);
 
-      // Store order data for later use
       setCurrentOrderData(fullOrderData);
       setIsOrderPlaced(true);
       setShowSuccessAnimation(true);
@@ -499,27 +489,18 @@ function Products() {
         document.body.removeChild(link);
         URL.revokeObjectURL(pdfUrl);
 
-        // Update PDF download status in database
+        // Update PDF download status in Firestore
         try {
-          const customerOrdersRef = ref(database, 'customerOrders');
-          const snapshot = await get(customerOrdersRef);
-          const orders = snapshot.val();
-          
-          if (orders) {
-            const orderKey = Object.keys(orders).find(key => 
-              orders[key].tokenNumber === currentOrderData.tokenNumber
-            );
-            
-            if (orderKey) {
-              const updateRef = ref(database, `customerOrders/${orderKey}`);
-              await set(updateRef, { ...orders[orderKey], pdfDownloaded: true });
-            }
+          const customerOrdersCollection = collection(firestore, 'customerOrders');
+          const querySnapshot = await getDocs(query(customerOrdersCollection, where("tokenNumber", "==", currentOrderData.tokenNumber)));
+          if (!querySnapshot.empty) {
+            const orderDoc = querySnapshot.docs[0];
+            await updateDoc(doc(firestore, 'customerOrders', orderDoc.id), { pdfDownloaded: true });
           }
         } catch (dbError) {
           console.error("Error updating PDF status:", dbError);
         }
 
-        // Mark PDF as downloaded and show WhatsApp button
         setPdfDownloaded(true);
         setShowWhatsAppButton(true);
         alert("PDF downloaded successfully! Now you can proceed to WhatsApp to share your order details.");
@@ -591,13 +572,12 @@ function Products() {
 
   const isCartEmpty = cart.length === 0;
 
-  // Get all unique categories from products for dynamic display
   const availableCategories = [...new Set(filteredProducts.map(p => p.categorys))].filter(cat => cat);
 
   return (
     <div className="products">
       <Helmet>
-        <title> UDHAYAM CRACKERS - Diwali Special Offers 2025</title>
+        <title>UDHAYAM CRACKERS - Diwali Special Offers 2025</title>
         <meta name="description" content="Browse our wide selection of high-quality crackers for all occasions. Filter by climate, search for specific products, and easily manage your cart." />
         <meta property="og:title" content="Udhayam Crackers - Product Catalog" />
         <meta property="og:description" content="Explore our diverse range of crackers. From morning to night, fancy to gift boxes, we have it all. Shop now for the best deals!" />
@@ -673,7 +653,6 @@ function Products() {
         {(() => {
           let globalIndex = 1;
           
-          // Use available categories instead of predefined ones
           return availableCategories.map(categorys => {
             const categoryProducts = filteredProducts.filter(product => product.categorys === categorys);
             if (categoryProducts.length === 0) return null;
@@ -767,7 +746,7 @@ function Products() {
                 placeholder="Enter your name"
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
-                className={`px-3 py-2 text-black mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-indigo-200 focus:ring-opacity-50 ${errors.name ? 'border-red-500' : ''}`}
+                className={`px-3 py-2 text-black mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 ${errors.name ? 'border-red-500' : ''}`}
                 required
                 disabled={isLoading}
               />

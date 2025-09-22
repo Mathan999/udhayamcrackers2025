@@ -2,9 +2,10 @@ import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore'; // Add Firestore import
 
 const firebaseConfig = {
- apiKey: "AIzaSyC8HzYSR1cN3JXTzpxSMakh_8KviOgYQLo",
+  apiKey: "AIzaSyC8HzYSR1cN3JXTzpxSMakh_8KviOgYQLo",
   authDomain: "udhayamcrackers-4dce4.firebaseapp.com",
   projectId: "udhayamcrackers-4dce4",
   storageBucket: "udhayamcrackers-4dce4.firebasestorage.app",
@@ -16,6 +17,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 const storage = getStorage(app);
-const auth = getAuth(app); // Initialize Firebase Auth
+const auth = getAuth(app);
+const firestore = getFirestore(app); // Initialize Firestore
 
-export { app, database, storage, auth }; // Export auth for use in LoginForm
+export { app, database, storage, auth, firestore }; // Export firestore
