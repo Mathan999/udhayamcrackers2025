@@ -1,38 +1,48 @@
 import React, { useState } from 'react';
+import { ref as dbRef, push } from 'firebase/database';
 import { collection, addDoc } from 'firebase/firestore';
-import { firestore } from './firebase';
+import { database, firestore } from './firebase';
 import './UploadProduct.css';
 
 function generateProductCode(selectedCategory) {
   const timestamp = Date.now().toString().slice(-4);
-  
   const categoryPrefix = {
-    'ELECTRIC CRACKERS': 'ELC',
-    'CHORSA & GAINT CRACKERS': 'CGC',
+    'ONE SOUND CRACKERS': 'OSC',
+    'CHROSA & GIANT CRACKERS': 'CGC',
     'DELUXE CRACKERS': 'DLX',
-    'WALA CRACKERS': 'WLA',
-    'BIJILI': 'BJL',
-    'PAPER BOMBS (ADIYAL)': 'PBA',
-    'BOMBS': 'BOM',
-    'PEACOCK SPECIAL': 'PSL',
+    'WALA SPECIAL': 'WLS',
+    'UDHAYAM CRACKERS THALA DIWALI SPECIAL': 'UCT',
+    'BIJILI CRACKERS': 'BJL',
+    'ATOM BOMBS': 'ATB',
     'FLOWER POTS': 'FLP',
     'GROUND CHAKKAR': 'GRC',
+    'CHILDREN COLLECTIONS': 'CHC',
+    'FOUNTAIN ITEMS': 'FTN',
+    'PARTY CELEBRATION - 2025 SPECIAL': 'PC5',
+    'CRACKLING FOUNTAIN': 'CRF',
+    'ROCKET': 'RCK',
     'TWINKLING STAR': 'TWS',
-    'KIDS SPECIAL - 1': 'KS1',
-    'NEW COLLECTION - 2025': 'NC5',
-    'FRUITS SHOWER': 'FRS',
-    'CANDLE SPECIAL': 'CND',
-    'MULTI NEW VARIETIES': 'MNV',
-    'KUTIES FUN': 'KTF',
-    'SKY ROCKETS': 'SKR',
-    'MATCHE BOXS': 'MTB',
-    'MULTI COLOUR ': 'MCL',
+    'CANDEL COLLECTION': 'CND',
+    'FANCY SINGLE SHOTS': 'FSS',
+    'FANCY CONTINIOUS SHOTS': 'FCS',
+    'COLOUR MATCHES': 'CLM',
     'SPARKLERS': 'SPK',
     'GIFT BOX - NO DISCOUNT': 'GBX'
   }[selectedCategory] || 'PRD';
-
   return `${categoryPrefix}${timestamp}`;
 }
+
+const convertImageToFile = async (imagePath) => {
+  try {
+    const response = await fetch(imagePath);
+    const blob = await response.blob();
+    const file = new File([blob], 'default-product.png', { type: blob.type });
+    return file;
+  } catch (error) {
+    console.error('Error converting image to file:', error);
+    return null;
+  }
+};
 
 const uploadToCloudinary = async (file) => {
   const formData = new FormData();
@@ -73,34 +83,27 @@ const UploadProduct = () => {
   const [errors, setErrors] = useState({});
 
   const categories = [
-    "ELECTRIC CRACKERS", 
-    "CHORSA & GAINT CRACKERS", 
-    "DELUXE CRACKERS", 
-    "WALA CRACKERS", 
-    "BIJILI", 
-    "PAPER BOMBS (ADIYAL)", 
-    "BOMBS",
-    "PEACOCK SPECIAL",
-    "FLOWER POTS", 
-    "GROUND CHAKKAR", 
-    "TWINKLING STAR", 
-    "KIDS SPECIAL - 1", 
-    "NEW COLLECTION - 2025", 
-    "FRUITS SHOWER", 
-    "CANDLE SPECIAL", 
-    "MULTI NEW VARIETIES", 
-    "KUTIES FUN", 
-    "SKY ROCKETS", 
-    "MATCHE BOXS", 
-    "MULTI COLOUR SINGLE SHOTS",
-    "MULTI COLOUR PIPE SHOTS",
-    "DAY SPECIAL FANCY",
-    "MULTI COLOUR LONG SHOTS",
-    "10 CM SPARKLERS",
-    "12 CM SPARKLERS",
-    "15 CM SPARKLERS",
-    "30 CM SPARKLERS", 
-    "50 SPARKLERS", 
+    "ONE SOUND CRACKERS",
+    "CHROSA & GIANT CRACKERS",
+    "DELUXE CRACKERS",
+    "WALA SPECIAL",
+    "UDHAYAM CRACKERS THALA DIWALI SPECIAL",
+    "BIJILI CRACKERS",
+    "ATOM BOMBS",
+    "FLOWER POTS",
+    "GROUND CHAKKAR",
+    "CHILDREN COLLECTIONS",
+    "FOUNTAIN ITEMS",
+    "PARTY CELEBRATION - 2025 SPECIAL",
+    "CRACKLING FOUNTAIN",
+    "ROCKET",
+    "TWINKLING STAR",
+    "CANDEL COLLECTION",
+    "FANCY SINGLE SHOTS",
+    "FANCY CONTINIOUS SHOTS",
+    "COLOUR MATCHES",
+    "SPARKLERS",
+    "GIFT BOX - NO DISCOUNT"
   ];
 
   const validateInputs = () => {
@@ -123,9 +126,6 @@ const UploadProduct = () => {
     if (ourPrice === '' || isNaN(ourPrice) || Number(ourPrice) <= 0) {
       newErrors.ourPrice = 'Please enter a valid price greater than 0';
     }
-    if (!image) {
-      newErrors.image = 'Please upload an image';
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -142,13 +142,17 @@ const UploadProduct = () => {
       let imageUrl = '';
       if (image) {
         imageUrl = await uploadToCloudinary(image);
+      } else {
+        const defaultImagePath = '/assets/logo_1x1.png';
+        const defaultImageFile = await convertImageToFile(defaultImagePath);
+        imageUrl = defaultImageFile ? await uploadToCloudinary(defaultImageFile) : '/assets/logo_1x1.png';
       }
 
       const product = {
         productName,
         category,
-        climate: selectedCategory,
         categorys: selectedCategory,
+        climate: selectedCategory, // For compatibility with Products.jsx
         mrp: Number(mrp),
         discount: Number(discount),
         ourPrice: Number(ourPrice),
@@ -156,10 +160,20 @@ const UploadProduct = () => {
         code: generateProductCode(selectedCategory),
       };
 
-      const productsCollection = collection(firestore, 'products');
-      await addDoc(productsCollection, product);
+      // Store in Firebase Realtime Database
+      const productsRef = dbRef(database, 'products');
+      const newProductRef = await push(productsRef);
+      await newProductRef.set(product);
 
-      console.log('Product uploaded successfully to Firestore!');
+      // Store in Firestore with the same ID as Realtime Database
+      const firestoreProduct = {
+        ...product,
+        id: newProductRef.key // Use the same ID as Realtime Database
+      };
+      await addDoc(collection(firestore, 'products'), firestoreProduct);
+
+      console.log('Product uploaded successfully to both databases!');
+      alert('Product uploaded successfully!');
       setProductName('');
       setCategory('1Box');
       setSelectedCategory('ELECTRIC CRACKERS');
@@ -169,9 +183,10 @@ const UploadProduct = () => {
       setImage(null);
       setErrors({});
 
-      window.location.reload();
+      const fileInput = document.getElementById('image');
+      if (fileInput) fileInput.value = '';
     } catch (error) {
-      console.error('Error uploading product to Firestore:', error);
+      console.error('Error uploading product:', error);
       alert('Error uploading product. Please try again.');
     } finally {
       setUploading(false);
@@ -183,15 +198,15 @@ const UploadProduct = () => {
       <h2 className="text-2xl font-bold mb-4 text-center text-black">Upload Product</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="image" className="block text-sm font-medium text-gray-700">Choose Image:</label>
+          <label htmlFor="image" className="block text-sm font-medium text-gray-700">Choose Image (Optional):</label>
           <input
             type="file"
             id="image"
             accept="image/*"
             onChange={(e) => setImage(e.target.files[0])}
-            className={`px-3 py-2 mt-1 block w-full rounded-md border-gray-300 bg-white text-black shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 ${errors.image ? 'border-red-500' : ''}`}
+            className="px-3 py-2 mt-1 block w-full rounded-md border-gray-300 bg-white text-black shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
           />
-          {errors.image && <span className="text-red-500 text-xs">{errors.image}</span>}
+          <p className="text-xs text-gray-500 mt-1">If no image is selected, a default image will be used.</p>
         </div>
 
         <div>
