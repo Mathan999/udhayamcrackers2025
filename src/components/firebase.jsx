@@ -5,13 +5,14 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore'; // Add Firestore import
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC8HzYSR1cN3JXTzpxSMakh_8KviOgYQLo",
-  authDomain: "udhayamcrackers-4dce4.firebaseapp.com",
-  projectId: "udhayamcrackers-4dce4",
-  storageBucket: "udhayamcrackers-4dce4.firebasestorage.app",
-  messagingSenderId: "1085906446955",
-  appId: "1:1085906446955:web:dc26f7418beeb072595f2e",
-  measurementId: "G-68DNVPWL2X"
+   apiKey: "AIzaSyBfWed0Cj1TfoG6Wa2p8kTaAwAW9fq94_s",
+  authDomain: "muthukumar-dfadd.firebaseapp.com",
+  databaseURL: "https://muthukumar-dfadd-default-rtdb.firebaseio.com",
+  projectId: "muthukumar-dfadd",
+  storageBucket: "muthukumar-dfadd.firebasestorage.app",
+  messagingSenderId: "580205235288",
+  appId: "1:580205235288:web:c8ac4c464427524c97ce2d",
+  measurementId: "G-94KVFE4C9C"
 };
 
 const app = initializeApp(firebaseConfig);
