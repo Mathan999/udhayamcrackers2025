@@ -22,35 +22,31 @@ function Products1() {
   const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
   const categories = [
-    "ELECTRIC CRACKERS",
-    "CHORSA & GAINT CRACKERS",
+    "ONE SOUND CRACKERS",
+    "CHROSA & GIANT CRACKERS",
     "DELUXE CRACKERS",
-    "WALA CRACKERS",
-    "BIJILI",
-    "PAPER BOMBS (ADIYAL)",
-    "BOMBS",
-    "PEACOCK SPECIAL",
+    "WALA SPECIAL",
+    "UDHAYAM CRACKERS THALA DIWALI SPECIAL",
+    "BIJILI CRACKERS",
+    "ATOM BOMBS",
     "FLOWER POTS",
     "GROUND CHAKKAR",
+    "CHILDREN COLLECTIONS",
+    "FOUNTAIN ITEMS",
+    "PARTY CELEBRATION - 2025 SPECIAL",
+    "CRACKLING FOUNTAIN",
+    "ROCKET",
     "TWINKLING STAR",
-    "KIDS SPECIAL - 1",
-    "NEW COLLECTION - 2025",
-    "FRUITS SHOWER",
-    "CANDLE SPECIAL",
-    "MULTI NEW VARIETIES",
-    "KUTIES FUN",
-    "SKY ROCKETS",
-    "MATCHE BOXS",
-    "MULTI COLOUR SINGLE SHOTS",
-    "MULTI COLOUR PIPE SHOTS",
-    "DAY SPECIAL FANCY",
-    "MULTI COLOUR LONG SHOTS",
-    "10 CM SPARKLERS",
-    "12 CM SPARKLERS",
-    "15 CM SPARKLERS",
-    "30 CM SPARKLERS",
-    "50 SPARKLERS"
+    "CANDEL COLLECTION",
+    "FANCY SINGLE SHOTS",
+    "FANCY CONTINIOUS SHOTS",
+    "COLOUR MATCHES",
+    "SPARKLERS",
+    "GIFT BOX - NO DISCOUNT"
   ];
+
+  // Generate category position options (1-21 for the 21 categories)
+  const categoryPositions = Array.from({ length: 21 }, (_, i) => i + 1);
 
   useEffect(() => {
     setLoading(true);
@@ -63,7 +59,8 @@ function Products1() {
         firestoreDocId: doc.id,
         ...doc.data(),
         categorys: doc.data().categorys || doc.data().climate || 'Unspecified',
-        imageUrl: doc.data().imageUrl || '/assets/logo_1x1.png'
+        imageUrl: doc.data().imageUrl || '/assets/logo_1x1.png',
+        categoryPosition: doc.data().categoryPosition || 1 // Default position is 1
       }));
       console.log('Firestore products:', firestoreProducts);
       setProducts(firestoreProducts);
@@ -109,7 +106,8 @@ function Products1() {
       categorys: product.categorys || product.climate || 'ELECTRIC CRACKERS',
       mrp: Number(product.mrp) || 0,
       discount: Number(product.discount) || 0,
-      ourPrice: Number(product.ourPrice) || 0
+      ourPrice: Number(product.ourPrice) || 0,
+      categoryPosition: product.categoryPosition || 1
     });
     setNewImage(null);
   };
@@ -142,6 +140,10 @@ function Products1() {
     const ourPrice = Number(product.ourPrice);
     if (isNaN(ourPrice) || ourPrice <= 0) {
       errors.ourPrice = 'Please enter a valid price greater than 0';
+    }
+    const categoryPosition = Number(product.categoryPosition);
+    if (isNaN(categoryPosition) || categoryPosition < 1 || categoryPosition > 21) {
+      errors.categoryPosition = 'Please select a valid category position (1-21)';
     }
     setError(Object.keys(errors).length > 0 ? Object.values(errors).join(', ') : null);
     return Object.keys(errors).length === 0;
@@ -205,7 +207,8 @@ function Products1() {
         mrp: Number(updatedProduct.mrp),
         discount: Number(updatedProduct.discount),
         ourPrice: Number(updatedProduct.ourPrice),
-        imageUrl: updatedProduct.imageUrl
+        imageUrl: updatedProduct.imageUrl,
+        categoryPosition: Number(updatedProduct.categoryPosition) // Add category position
       });
       console.log("Firestore updated successfully for doc ID:", editingProduct.firestoreDocId);
 
@@ -274,6 +277,7 @@ function Products1() {
                   <th className="px-4 py-2">Product</th>
                   <th className="px-4 py-2">Per</th>
                   <th className="px-4 py-2">Category</th>
+                  <th className="px-4 py-2">Category Position</th>
                   <th className="px-4 py-2">M.R.P</th>
                   <th className="px-4 py-2">Discount</th>
                   <th className="px-4 py-2">Our Price</th>
@@ -366,6 +370,24 @@ function Products1() {
                         </select>
                       ) : (
                         product.categorys || 'Unspecified'
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {editingProduct?.id === product.id ? (
+                        <select
+                          value={editingProduct.categoryPosition || 1}
+                          onChange={(e) => setEditingProduct({...editingProduct, categoryPosition: parseInt(e.target.value)})}
+                          className="w-full p-1 border rounded"
+                          title="Select the display order position for this category (1 = first, 21 = last)"
+                        >
+                          {categoryPositions.map((pos) => (
+                            <option key={pos} value={pos}>
+                              {pos}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        product.categoryPosition || 1
                       )}
                     </td>
                     <td className="px-4 py-2">

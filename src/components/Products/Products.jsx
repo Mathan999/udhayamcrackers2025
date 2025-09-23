@@ -98,7 +98,8 @@ function Products() {
         id: doc.id,
         ...doc.data(),
         categorys: doc.data().climate || doc.data().categorys || doc.data().category || 'Unspecified',
-        imageUrl: doc.data().imageUrl || defaultProductImage
+        imageUrl: doc.data().imageUrl || defaultProductImage,
+        categoryPosition: doc.data().categoryPosition || 1 // Default position is 1
       }));
       console.log('Fetched Products from Firestore:', loadedProducts);
       console.log('Categories found:', [...new Set(loadedProducts.map(p => p.categorys))]);
@@ -555,8 +556,6 @@ function Products() {
 
   const isCartEmpty = cart.length === 0;
 
-  const availableCategories = [...new Set(filteredProducts.map(p => p.categorys))].filter(cat => cat);
-
   return (
     <div className="products">
       <Helmet>
@@ -636,77 +635,82 @@ function Products() {
         {(() => {
           let globalIndex = 1;
           
-          return availableCategories.map(categorys => {
-            const categoryProducts = filteredProducts.filter(product => product.categorys === categorys);
-            if (categoryProducts.length === 0) return null;
+          return categories.map(category => {
+            const categoryProducts = filteredProducts
+              .filter(product => product.categorys === category)
+              .sort((a, b) => (a.categoryPosition || 1) - (b.categoryPosition || 1)); // Sort by categoryPosition if available
 
             return (
-              <div key={categorys}>
-                <h2>{categorys}</h2>
+              <div key={category}>
+                <h2>{category}</h2>
                 <div className="responsive-table">
-                  <table>
-                    <thead style={{ backgroundColor: '#00D109' }}>
-                      <tr>
-                        <th style={{ backgroundColor: '#00D109', color: 'white' }}>Preview</th>
-                        <th style={{ backgroundColor: '#00D109', color: 'white' }}>No.</th>
-                        <th style={{ backgroundColor: '#00D109', color: 'white' }}>Product</th>
-                        <th style={{ backgroundColor: '#00D109', color: 'white' }}>Per</th>
-                        <th style={{ backgroundColor: '#00D109', color: 'white' }}>M.R.P</th>
-                        <th style={{ backgroundColor: '#00D109', color: 'white' }}>Our Price</th>
-                        <th style={{ backgroundColor: '#00D109', color: 'white' }}>Qty</th>
-                        <th style={{ backgroundColor: '#00D109', color: 'white' }}>Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {categoryProducts.map((product) => {
-                        const currentIndex = globalIndex++;
-                        return (
-                          <tr key={product.id}>
-                            <td data-label="Preview">
-                              <img
-                                className='product-image'
-                                src={getImageUrl(product)}
-                                alt={product.productName || 'Product'}
-                                onError={(e) => handleImageError(e, product)}
-                              />
-                            </td>
-                            <td data-label="No.">{currentIndex}</td>
-                            <td data-label="Product">{product.productName || '-'}</td>
-                            <td data-label="Per">{product.category || '-'}</td>
-                            <td data-label="M.R.P"><s>₹{Number(product.mrp || 0).toFixed(2)}</s></td>
-                            <td data-label="Our Price">₹{Number(product.ourPrice || 0).toFixed(2)}</td>
-                            <td>
-                              <div className="quantity-control">
-                                <button 
-                                  onClick={() => decrementQuantity(product)} 
-                                  className="quantity-button"
-                                  disabled={isLoading}
-                                >
-                                  <Minus size={15} />
-                                </button>
-                                <input
-                                  type="text"
-                                  value={cart.find(item => item.id === product.id)?.quantity || ""}
-                                  onChange={(e) => updateCart(product, parseInt(e.target.value) || 0)}
-                                  className="quantity-input"
-                                  placeholder='0'
-                                  disabled={isLoading}
+                  {categoryProducts.length > 0 ? (
+                    <table>
+                      <thead style={{ backgroundColor: '#00D109' }}>
+                        <tr>
+                          <th style={{ backgroundColor: '#00D109', color: 'white' }}>Preview</th>
+                          <th style={{ backgroundColor: '#00D109', color: 'white' }}>No.</th>
+                          <th style={{ backgroundColor: '#00D109', color: 'white' }}>Product</th>
+                          <th style={{ backgroundColor: '#00D109', color: 'white' }}>Per</th>
+                          <th style={{ backgroundColor: '#00D109', color: 'white' }}>M.R.P</th>
+                          <th style={{ backgroundColor: '#00D109', color: 'white' }}>Our Price</th>
+                          <th style={{ backgroundColor: '#00D109', color: 'white' }}>Qty</th>
+                          <th style={{ backgroundColor: '#00D109', color: 'white' }}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {categoryProducts.map((product) => {
+                          const currentIndex = globalIndex++;
+                          return (
+                            <tr key={product.id}>
+                              <td data-label="Preview">
+                                <img
+                                  className='product-image'
+                                  src={getImageUrl(product)}
+                                  alt={product.productName || 'Product'}
+                                  onError={(e) => handleImageError(e, product)}
                                 />
-                                <button 
-                                  onClick={() => incrementQuantity(product)} 
-                                  className="quantity-button"
-                                  disabled={isLoading}
-                                >
-                                  <Plus size={15} />
-                                </button>
-                              </div>
-                            </td>
-                            <td data-label="Total">₹{(Number(product.ourPrice || 0) * (cart.find(item => item.id === product.id)?.quantity || 0)).toFixed(2)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                              </td>
+                              <td data-label="No.">{currentIndex}</td>
+                              <td data-label="Product">{product.productName || '-'}</td>
+                              <td data-label="Per">{product.category || '-'}</td>
+                              <td data-label="M.R.P"><s>₹{Number(product.mrp || 0).toFixed(2)}</s></td>
+                              <td data-label="Our Price">₹{Number(product.ourPrice || 0).toFixed(2)}</td>
+                              <td>
+                                <div className="quantity-control">
+                                  <button 
+                                    onClick={() => decrementQuantity(product)} 
+                                    className="quantity-button"
+                                    disabled={isLoading}
+                                  >
+                                    <Minus size={15} />
+                                  </button>
+                                  <input
+                                    type="text"
+                                    value={cart.find(item => item.id === product.id)?.quantity || ""}
+                                    onChange={(e) => updateCart(product, parseInt(e.target.value) || 0)}
+                                    className="quantity-input"
+                                    placeholder='0'
+                                    disabled={isLoading}
+                                  />
+                                  <button 
+                                    onClick={() => incrementQuantity(product)} 
+                                    className="quantity-button"
+                                    disabled={isLoading}
+                                  >
+                                    <Plus size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                              <td data-label="Total">₹{(Number(product.ourPrice || 0) * (cart.find(item => item.id === product.id)?.quantity || 0)).toFixed(2)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="text-gray-500">No products available in this category.</p>
+                  )}
                 </div>
               </div>
             );
