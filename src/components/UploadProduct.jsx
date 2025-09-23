@@ -1,41 +1,39 @@
 import React, { useState } from 'react';
-import { ref as dbRef, push } from 'firebase/database';
-import { database } from './firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { firestore } from './firebase';
 import './UploadProduct.css';
 
 function generateProductCode(selectedCategory) {
   const timestamp = Date.now().toString().slice(-4);
   
-  // Create a mapping for category prefixes based on your actual categories
   const categoryPrefix = {
-  'ELECTRIC CRACKERS': 'ELC',
-  'CHORSA & GAINT CRACKERS': 'CGC',
-  'DELUXE CRACKERS': 'DLX',
-  'WALA CRACKERS': 'WLA',
-  'BIJILI': 'BJL',
-  'PAPER BOMBS (ADIYAL)': 'PBA',
-  'BOMBS': 'BOM',
-  'PEACOCK SPECIAL': 'PSL',
-  'FLOWER POTS': 'FLP',
-  'GROUND CHAKKAR': 'GRC',
-  'TWINKLING STAR': 'TWS',
-  'KIDS SPECIAL - 1': 'KS1',
-  'NEW COLLECTION - 2025': 'NC5',
-  'FRUITS SHOWER': 'FRS',
-  'CANDLE SPECIAL': 'CND',
-  'MULTI NEW VARIETIES': 'MNV',
-  'KUTIES FUN': 'KTF',
-  'SKY ROCKETS': 'SKR',
-  'MATCHE BOXS': 'MTB',
-  'MULTI COLOUR ': 'MCL',
-  'SPARKLERS': 'SPK',
-  'GIFT BOX - NO DISCOUNT': 'GBX'
-}[selectedCategory] || 'PRD';
+    'ELECTRIC CRACKERS': 'ELC',
+    'CHORSA & GAINT CRACKERS': 'CGC',
+    'DELUXE CRACKERS': 'DLX',
+    'WALA CRACKERS': 'WLA',
+    'BIJILI': 'BJL',
+    'PAPER BOMBS (ADIYAL)': 'PBA',
+    'BOMBS': 'BOM',
+    'PEACOCK SPECIAL': 'PSL',
+    'FLOWER POTS': 'FLP',
+    'GROUND CHAKKAR': 'GRC',
+    'TWINKLING STAR': 'TWS',
+    'KIDS SPECIAL - 1': 'KS1',
+    'NEW COLLECTION - 2025': 'NC5',
+    'FRUITS SHOWER': 'FRS',
+    'CANDLE SPECIAL': 'CND',
+    'MULTI NEW VARIETIES': 'MNV',
+    'KUTIES FUN': 'KTF',
+    'SKY ROCKETS': 'SKR',
+    'MATCHE BOXS': 'MTB',
+    'MULTI COLOUR ': 'MCL',
+    'SPARKLERS': 'SPK',
+    'GIFT BOX - NO DISCOUNT': 'GBX'
+  }[selectedCategory] || 'PRD';
 
   return `${categoryPrefix}${timestamp}`;
 }
 
-// Cloudinary upload function
 const uploadToCloudinary = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
@@ -66,8 +64,6 @@ const uploadToCloudinary = async (file) => {
 const UploadProduct = () => {
   const [productName, setProductName] = useState('');
   const [category, setCategory] = useState('1Box');
-  // Changed variable name from 'climate' to 'selectedCategory' for clarity
-  // Initialize with the first category from the list
   const [selectedCategory, setSelectedCategory] = useState('ELECTRIC CRACKERS');
   const [mrp, setMrp] = useState('');
   const [discount, setDiscount] = useState('');
@@ -77,42 +73,41 @@ const UploadProduct = () => {
   const [errors, setErrors] = useState({});
 
   const categories = [
-  "ELECTRIC CRACKERS", 
-  "CHORSA & GAINT CRACKERS", 
-  "DELUXE CRACKERS", 
-  "WALA CRACKERS", 
-  "BIJILI", 
-  "PAPER BOMBS (ADIYAL)", 
-  "BOMBS",
-  "PEACOCK SPECIAL",
-  "FLOWER POTS", 
-  "GROUND CHAKKAR", 
-  "TWINKLING STAR", 
-  "KIDS SPECIAL - 1", 
-  "NEW COLLECTION - 2025", 
-  "FRUITS SHOWER", 
-  "CANDLE SPECIAL", 
-  "MULTI NEW VARIETIES", 
-  "KUTIES FUN", 
-  "SKY ROCKETS", 
-  "MATCHE BOXS", 
-  "MULTI COLOUR SINGLE SHOTS",
-  "MULTI COLOUR PIPE SHOTS",
-  "DAY SPECIAL FANCY",
-  "MULTI COLOUR LONG SHOTS",
-  "10 CM SPARKLERS",
-  "12 CM SPARKLERS",
-  "15 CM SPARKLERS",
-  "30 CM SPARKLERS", 
-  "50 SPARKLERS", 
-];
+    "ELECTRIC CRACKERS", 
+    "CHORSA & GAINT CRACKERS", 
+    "DELUXE CRACKERS", 
+    "WALA CRACKERS", 
+    "BIJILI", 
+    "PAPER BOMBS (ADIYAL)", 
+    "BOMBS",
+    "PEACOCK SPECIAL",
+    "FLOWER POTS", 
+    "GROUND CHAKKAR", 
+    "TWINKLING STAR", 
+    "KIDS SPECIAL - 1", 
+    "NEW COLLECTION - 2025", 
+    "FRUITS SHOWER", 
+    "CANDLE SPECIAL", 
+    "MULTI NEW VARIETIES", 
+    "KUTIES FUN", 
+    "SKY ROCKETS", 
+    "MATCHE BOXS", 
+    "MULTI COLOUR SINGLE SHOTS",
+    "MULTI COLOUR PIPE SHOTS",
+    "DAY SPECIAL FANCY",
+    "MULTI COLOUR LONG SHOTS",
+    "10 CM SPARKLERS",
+    "12 CM SPARKLERS",
+    "15 CM SPARKLERS",
+    "30 CM SPARKLERS", 
+    "50 SPARKLERS", 
+  ];
 
   const validateInputs = () => {
     const newErrors = {};
     if (!productName || productName.length < 3) {
       newErrors.productName = 'Product name must be at least 3 characters';
     }
-    // Fixed validation to use selectedCategory instead of climate
     if (!selectedCategory || selectedCategory === 'Select Category') {
       newErrors.selectedCategory = 'Please select a valid category';
     }
@@ -152,25 +147,21 @@ const UploadProduct = () => {
       const product = {
         productName,
         category,
-        // Store the selected category in the 'climate' field to maintain compatibility with Products.jsx
         climate: selectedCategory,
-        // Also store it as 'categorys' for better clarity
         categorys: selectedCategory,
         mrp: Number(mrp),
         discount: Number(discount),
         ourPrice: Number(ourPrice),
         imageUrl,
-        // Use selectedCategory for code generation
         code: generateProductCode(selectedCategory),
       };
 
-      const productsRef = dbRef(database, 'products');
-      await push(productsRef, product);
+      const productsCollection = collection(firestore, 'products');
+      await addDoc(productsCollection, product);
 
-      console.log('Product uploaded successfully!');
+      console.log('Product uploaded successfully to Firestore!');
       setProductName('');
       setCategory('1Box');
-      // Reset to first category instead of invalid value
       setSelectedCategory('ELECTRIC CRACKERS');
       setMrp('');
       setDiscount('');
@@ -180,7 +171,7 @@ const UploadProduct = () => {
 
       window.location.reload();
     } catch (error) {
-      console.error('Error uploading product:', error);
+      console.error('Error uploading product to Firestore:', error);
       alert('Error uploading product. Please try again.');
     } finally {
       setUploading(false);

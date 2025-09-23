@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
-import { ref, onValue, get, set, off } from "firebase/database";
+import { ref, onValue, get, set } from "firebase/database";
 import { database } from "../firebase";
-import { collection, addDoc } from "firebase/firestore";
-import { firestore } from "../firebase"; // Import Firestore
+import { collection, addDoc, onSnapshot, getDocs, query, where, updateDoc, doc } from "firebase/firestore";
+import { firestore } from "../firebase";
 import { Plus, Minus, Loader2, CheckCircle, Download } from "lucide-react";
 import { jsPDF } from "jspdf";
 import "./Products.css";
 
-// Use Cloudinary URL for QR code image
 const qrCodeImage = 'https://res.cloudinary.com/dirbsbdfh/image/upload/v1758038640/1000252086_h7oufe.jpg';
 const defaultProductImage = '../assets/logo_1x1.png';
 
@@ -96,27 +95,25 @@ function Products() {
   }, [handleScroll]);
 
   useEffect(() => {
-    const productsRef = ref(database, 'products');
+    const productsCollection = collection(firestore, 'products');
     const invoiceCounterRef = ref(database, 'invoiceCounter');
     const tokenCounterRef = ref(database, 'tokenCounter');
 
-    const handleProductData = (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const loadedProducts = Object.entries(data).map(([key, value]) => ({
-          id: key,
-          ...value,
-          categorys: value.climate || value.categorys || value.category || 'Unspecified',
-          imageUrl: value.imageUrl || defaultProductImage
-        }));
-        console.log('Fetched Products:', loadedProducts);
-        console.log('Categories found:', [...new Set(loadedProducts.map(p => p.categorys))]);
-        setProducts(loadedProducts);
-      } else {
-        console.log('No products found in Firebase');
-        setProducts([]);
-      }
-    };
+    // Fetch products from Firestore only
+    const unsubscribe = onSnapshot(productsCollection, (snapshot) => {
+      const loadedProducts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        categorys: doc.data().climate || doc.data().categorys || doc.data().category || 'Unspecified',
+        imageUrl: doc.data().imageUrl || defaultProductImage
+      }));
+      console.log('Fetched Products from Firestore:', loadedProducts);
+      console.log('Categories found:', [...new Set(loadedProducts.map(p => p.categorys))]);
+      setProducts(loadedProducts);
+    }, (error) => {
+      console.error("Error fetching products from Firestore:", error);
+      alert("Failed to fetch products. Please check your connection or try again.");
+    });
 
     const fetchCounters = async () => {
       try {
@@ -134,13 +131,9 @@ function Products() {
       }
     };
 
-    onValue(productsRef, handleProductData, (error) => {
-      console.error("Error fetching products:", error);
-      alert("Failed to fetch products. Please check your connection or try again.");
-    });
     fetchCounters();
 
-    return () => off(productsRef);
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -424,7 +417,6 @@ function Products() {
     const tokenCounterRef = ref(database, 'tokenCounter');
 
     try {
-      // Save to Firestore collections 'orders' and 'customerOrders'
       const ordersCollection = collection(firestore, 'orders');
       const customerOrdersCollection = collection(firestore, 'customerOrders');
       
@@ -444,7 +436,6 @@ function Products() {
         cart: fullOrderData.cart
       });
       
-      // Update counters in Realtime Database
       await set(invoiceCounterRef, newInvoiceNumber);
       await set(tokenCounterRef, newTokenNumber);
       
@@ -489,7 +480,6 @@ function Products() {
         document.body.removeChild(link);
         URL.revokeObjectURL(pdfUrl);
 
-        // Update PDF download status in Firestore
         try {
           const customerOrdersCollection = collection(firestore, 'customerOrders');
           const querySnapshot = await getDocs(query(customerOrdersCollection, where("tokenNumber", "==", currentOrderData.tokenNumber)));
