@@ -33,7 +33,7 @@ function Products() {
   const [pdfDownloaded, setPdfDownloaded] = useState(false);
   const [showWhatsAppButton, setShowWhatsAppButton] = useState(false);
 
- const categories = [
+  const categories = [
     "ONE SOUND CRACKERS",
     "CHROSA & GIANT CRACKERS",
     "DELUXE CRACKERS",

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { ref as dbRef, push } from 'firebase/database';
 import { collection, addDoc } from 'firebase/firestore';
-import { database, firestore } from './firebase';
+import { firestore } from './firebase';
 import './UploadProduct.css';
 
 function generateProductCode(selectedCategory) {
@@ -74,7 +73,7 @@ const uploadToCloudinary = async (file) => {
 const UploadProduct = () => {
   const [productName, setProductName] = useState('');
   const [category, setCategory] = useState('1Box');
-  const [selectedCategory, setSelectedCategory] = useState('ELECTRIC CRACKERS');
+  const [selectedCategory, setSelectedCategory] = useState('ONE SOUND CRACKERS');
   const [mrp, setMrp] = useState('');
   const [discount, setDiscount] = useState('');
   const [ourPrice, setOurPrice] = useState('');
@@ -160,23 +159,14 @@ const UploadProduct = () => {
         code: generateProductCode(selectedCategory),
       };
 
-      // Store in Firebase Realtime Database
-      const productsRef = dbRef(database, 'products');
-      const newProductRef = await push(productsRef);
-      await newProductRef.set(product);
+      // Store in Firestore
+      const docRef = await addDoc(collection(firestore, 'products'), product);
 
-      // Store in Firestore with the same ID as Realtime Database
-      const firestoreProduct = {
-        ...product,
-        id: newProductRef.key // Use the same ID as Realtime Database
-      };
-      await addDoc(collection(firestore, 'products'), firestoreProduct);
-
-      console.log('Product uploaded successfully to both databases!');
+      console.log('Product uploaded successfully to Firestore with ID:', docRef.id);
       alert('Product uploaded successfully!');
       setProductName('');
       setCategory('1Box');
-      setSelectedCategory('ELECTRIC CRACKERS');
+      setSelectedCategory('ONE SOUND CRACKERS');
       setMrp('');
       setDiscount('');
       setOurPrice('');
