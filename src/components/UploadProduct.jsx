@@ -151,7 +151,7 @@ const UploadProduct = () => {
         productName,
         category,
         categorys: selectedCategory,
-        climate: selectedCategory, // For compatibility with Products.jsx
+        climate: selectedCategory,
         mrp: Number(mrp),
         discount: Number(discount),
         ourPrice: Number(ourPrice),
@@ -159,9 +159,8 @@ const UploadProduct = () => {
         code: generateProductCode(selectedCategory),
       };
 
-      // Store in Firestore
+      console.log('Attempting to upload product:', product);
       const docRef = await addDoc(collection(firestore, 'products'), product);
-
       console.log('Product uploaded successfully to Firestore with ID:', docRef.id);
       alert('Product uploaded successfully!');
       setProductName('');
@@ -177,7 +176,7 @@ const UploadProduct = () => {
       if (fileInput) fileInput.value = '';
     } catch (error) {
       console.error('Error uploading product:', error);
-      alert('Error uploading product. Please try again.');
+      alert('Error uploading product. Please check your connection or try again.');
     } finally {
       setUploading(false);
     }

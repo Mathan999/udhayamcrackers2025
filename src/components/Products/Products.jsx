@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
-import { ref, onValue, get, set } from "firebase/database";
-import { database } from "../firebase";
+import { ref, get, set } from "firebase/database";
+import { database, firestore, auth } from "../firebase";
 import { collection, addDoc, onSnapshot, getDocs, query, where, updateDoc, doc } from "firebase/firestore";
-import { firestore } from "../firebase";
 import { Plus, Minus, Loader2, CheckCircle, Download } from "lucide-react";
 import { jsPDF } from "jspdf";
 import "./Products.css";
@@ -32,6 +31,7 @@ function Products() {
   const [currentOrderData, setCurrentOrderData] = useState(null);
   const [pdfDownloaded, setPdfDownloaded] = useState(false);
   const [showWhatsAppButton, setShowWhatsAppButton] = useState(false);
+  const [isProductLoading, setIsProductLoading] = useState(true);
 
   const categories = [
     "ONE SOUND CRACKERS",
@@ -68,7 +68,7 @@ function Products() {
   };
 
   const handleImageError = (e, product) => {
-    console.error(`Failed to load image for ${product.productName}: ${e.target.src}`);
+    console.error(`Image load error for ${product.productName || 'Unknown'}: ${e.target.src}`);
     if (e.target.src !== defaultProductImage) {
       e.target.src = defaultProductImage;
     }
@@ -88,45 +88,55 @@ function Products() {
   }, [handleScroll]);
 
   useEffect(() => {
+    setIsProductLoading(true);
     const productsCollection = collection(firestore, 'products');
     const invoiceCounterRef = ref(database, 'invoiceCounter');
     const tokenCounterRef = ref(database, 'tokenCounter');
 
-    // Fetch products from Firestore only
+    // Fetch products from Firestore
     const unsubscribe = onSnapshot(productsCollection, (snapshot) => {
-      const loadedProducts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        categorys: doc.data().climate || doc.data().categorys || doc.data().category || 'Unspecified',
-        imageUrl: doc.data().imageUrl || defaultProductImage,
-        categoryPosition: doc.data().categoryPosition || 1 // Default position is 1
-      }));
-      console.log('Fetched Products from Firestore:', loadedProducts);
-      console.log('Categories found:', [...new Set(loadedProducts.map(p => p.categorys))]);
-      setProducts(loadedProducts);
+      console.log('Firestore snapshot received, size:', snapshot.size);
+      if (snapshot.empty) {
+        console.warn("No products found in Firestore 'products' collection");
+        setProducts([]);
+      } else {
+        const loadedProducts = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            categorys: data.climate || data.categorys || data.category || 'Unspecified',
+            imageUrl: data.imageUrl || defaultProductImage,
+            categoryPosition: data.categoryPosition || 1
+          };
+        });
+        console.log('Fetched Products:', loadedProducts);
+        setProducts(loadedProducts);
+      }
+      setIsProductLoading(false);
     }, (error) => {
-      console.error("Error fetching products from Firestore:", error);
-      alert("Failed to fetch products. Please check your connection or try again.");
+      console.error("Firestore fetch error:", error.code, error.message);
+      alert("Failed to fetch products: " + error.message);
+      setIsProductLoading(false);
     });
 
+    // Fetch counters
     const fetchCounters = async () => {
       try {
         const invoiceSnapshot = await get(invoiceCounterRef);
         const tokenSnapshot = await get(tokenCounterRef);
-        
         const invoiceCounter = invoiceSnapshot.val() || 0;
         const tokenCounter = tokenSnapshot.val() || 0;
-        
+        console.log("Counters fetched:", { invoiceCounter, tokenCounter });
         setLastInvoiceNumber(invoiceCounter);
         setLastTokenNumber(tokenCounter);
       } catch (error) {
-        console.error("Error fetching counters:", error);
-        alert("Failed to fetch counters. Please try again.");
+        console.error("Counter fetch error:", error.code, error.message);
+        alert("Failed to fetch counters: " + error.message);
       }
     };
 
     fetchCounters();
-
     return () => unsubscribe();
   }, []);
 
@@ -143,6 +153,10 @@ function Products() {
   );
 
   const updateCart = (product, quantity) => {
+    if (!auth.currentUser) {
+      alert("Please log in to modify the cart");
+      return;
+    }
     setCart(prevCart => {
       const existingItemIndex = prevCart.findIndex(item => item.id === product.id);
       if (existingItemIndex !== -1) {
@@ -173,17 +187,24 @@ function Products() {
   };
 
   const clearCart = () => {
-    setCart([]);
-    setUserName('');
-    setUserPhone('');
-    setUserAddress('');
-    setUserCity('');
-    setErrors({});
-    setIsOrderPlaced(false);
-    setShowSuccessAnimation(false);
-    setCurrentOrderData(null);
-    setPdfDownloaded(false);
-    setShowWhatsAppButton(false);
+    if (!auth.currentUser) {
+      alert("Please log in to clear the cart");
+      return;
+    }
+    if (window.confirm("Are you sure you want to clear the cart?")) {
+      setCart([]);
+      setUserName('');
+      setUserPhone('');
+      setUserAddress('');
+      setUserCity('');
+      setErrors({});
+      setIsOrderPlaced(false);
+      setShowSuccessAnimation(false);
+      setCurrentOrderData(null);
+      setPdfDownloaded(false);
+      setShowWhatsAppButton(false);
+      console.log("Cart cleared by user:", auth.currentUser.uid);
+    }
   };
 
   const generatePDF = (orderData) => {
@@ -203,7 +224,7 @@ function Products() {
       doc.addImage(qrCodeImage, 'JPEG', 150, 50, 40, 40);
       console.log('QR code added to PDF');
     } catch (error) {
-      console.error('Error adding QR code:', error);
+      console.error('QR code error:', error.message);
     }
 
     doc.setFontSize(10);
@@ -354,6 +375,12 @@ function Products() {
   };
 
   const sendWhatsAppMessage = (orderData) => {
+    if (!auth.currentUser) {
+      console.warn("Unauthorized WhatsApp share attempt");
+      alert("Please log in to share via WhatsApp");
+      return;
+    }
+
     const countryCode = "91";
     const mobileNumber = "9597413148";
     const phoneNumber = countryCode + mobileNumber;
@@ -373,24 +400,38 @@ function Products() {
       document.body.appendChild(whatsappLink);
       whatsappLink.click();
       document.body.removeChild(whatsappLink);
-
-      alert("WhatsApp opened successfully! Please attach the downloaded PDF invoice to the chat and send it along with the order details.");
+      console.log("WhatsApp message opened for order:", orderData.tokenNumber);
+      alert("WhatsApp opened successfully! Please attach the downloaded PDF invoice.");
       return true;
     } catch (error) {
-      console.error("Error opening WhatsApp:", error);
-      alert("Failed to open WhatsApp. Please ensure WhatsApp is installed and try again, or manually contact +919080533427 with your order details and the downloaded PDF.");
+      console.error("WhatsApp error:", error.message);
+      alert("Failed to open WhatsApp: " + error.message);
       return false;
     }
   };
 
   const handlePurchase = async (orderData) => {
+    if (!auth.currentUser) {
+      console.warn("Unauthorized purchase attempt");
+      alert("Please log in to place an order");
+      return;
+    }
+
     if (cart.length === 0) {
+      console.log("Empty cart");
       alert("Your cart is empty!");
       return;
     }
 
-    if (totalAmount < 1) {
-      alert("YOUR ORDER IS LOW COST SO ORDER ABOVE 3000");
+    if (totalAmount < 3000) {
+      console.log("Total amount too low:", totalAmount);
+      alert("YOUR ORDER IS LOW COST SO ORDER ABOVE ₹3000");
+      return;
+    }
+
+    if (!orderData.userName || !orderData.userAddress || !orderData.userCity || !orderData.userPhone) {
+      console.log("Incomplete order data:", orderData);
+      alert("Please fill in all customer information");
       return;
     }
 
@@ -404,8 +445,11 @@ function Products() {
       invoiceNumber: newInvoiceNumber,
       tokenNumber: newTokenNumber.toString(),
       status: 'Pending',
-      pdfDownloaded: false
+      pdfDownloaded: false,
+      userId: auth.currentUser.uid
     };
+
+    console.log("Attempting to save order:", fullOrderData);
 
     const invoiceCounterRef = ref(database, 'invoiceCounter');
     const tokenCounterRef = ref(database, 'tokenCounter');
@@ -414,8 +458,10 @@ function Products() {
       const ordersCollection = collection(firestore, 'orders');
       const customerOrdersCollection = collection(firestore, 'customerOrders');
       
-      await addDoc(ordersCollection, fullOrderData);
-      await addDoc(customerOrdersCollection, {
+      const orderDocRef = await addDoc(ordersCollection, fullOrderData);
+      console.log("Order saved with ID:", orderDocRef.id);
+      
+      const customerOrderDocRef = await addDoc(customerOrdersCollection, {
         id: Date.now(),
         customer: fullOrderData.userName,
         address: fullOrderData.userAddress,
@@ -427,30 +473,38 @@ function Products() {
         orderDate: fullOrderData.orderDate,
         totalAmount: fullOrderData.totalAmount,
         pdfDownloaded: false,
-        cart: fullOrderData.cart
+        cart: fullOrderData.cart,
+        userId: auth.currentUser.uid
       });
+      console.log("Customer order saved with ID:", customerOrderDocRef.id);
       
       await set(invoiceCounterRef, newInvoiceNumber);
       await set(tokenCounterRef, newTokenNumber);
+      console.log("Counters updated:", { newInvoiceNumber, newTokenNumber });
       
       setLastInvoiceNumber(newInvoiceNumber);
       setLastTokenNumber(newTokenNumber);
-
       setCurrentOrderData(fullOrderData);
       setIsOrderPlaced(true);
       setShowSuccessAnimation(true);
       setTimeout(() => setShowSuccessAnimation(false), 3000);
 
-      alert(`Order placed successfully! Your Token Number is: ${newTokenNumber}. Please download the PDF invoice and then proceed to WhatsApp.`);
+      alert(`Order placed successfully! Token: ${newTokenNumber}`);
     } catch (error) {
-      console.error("Error processing order:", error);
-      alert(`Failed to process your order: ${error.message}. Please try again.`);
+      console.error("Order save error:", error.code, error.message);
+      alert(`Failed to process order: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handlePdfDownload = async () => {
+    if (!auth.currentUser) {
+      console.warn("Unauthorized PDF download attempt");
+      alert("Please log in to download PDF");
+      return;
+    }
+
     setIsPdfDownloading(true);
     try {
       if (currentOrderData) {
@@ -480,17 +534,23 @@ function Products() {
           if (!querySnapshot.empty) {
             const orderDoc = querySnapshot.docs[0];
             await updateDoc(doc(firestore, 'customerOrders', orderDoc.id), { pdfDownloaded: true });
+            console.log("PDF download status updated for order:", orderDoc.id);
+          } else {
+            console.warn("No matching customer order found for token:", currentOrderData.tokenNumber);
           }
         } catch (dbError) {
-          console.error("Error updating PDF status:", dbError);
+          console.error("PDF status update error:", dbError.message);
         }
 
         setPdfDownloaded(true);
         setShowWhatsAppButton(true);
-        alert("PDF downloaded successfully! Now you can proceed to WhatsApp to share your order details.");
+        alert("PDF downloaded successfully!");
+      } else {
+        console.warn("No current order data for PDF download");
+        alert("No order data available to generate PDF");
       }
     } catch (error) {
-      console.error("Error generating PDF:", error);
+      console.error("PDF generation error:", error.message);
       alert(`Failed to generate PDF: ${error.message}`);
     } finally {
       setIsPdfDownloading(false);
@@ -498,10 +558,17 @@ function Products() {
   };
 
   const handleWhatsAppShare = () => {
+    if (!auth.currentUser) {
+      console.warn("Unauthorized WhatsApp share attempt");
+      alert("Please log in to share via WhatsApp");
+      return;
+    }
+
     if (currentOrderData && pdfDownloaded) {
       sendWhatsAppMessage(currentOrderData);
     } else {
-      alert("Please download the PDF first before proceeding to WhatsApp.");
+      console.log("PDF not downloaded or no order data");
+      alert("Please download the PDF first.");
     }
   };
 
@@ -522,8 +589,8 @@ function Products() {
     if (!userName || !nameRegex.test(userName) || userName.length < 3 || userName.length > 50) {
       newErrors.name = 'Name must be 3-50 characters and contain only letters, spaces, and dots';
     }
-    if (!userAddress || !addressRegex.test(userAddress) || userAddress.length < 2 || userAddress.length > 100) {
-      newErrors.address = 'Address must be between 10 and 100 characters and not contain < or >';
+    if (!userAddress || !addressRegex.test(userAddress) || userAddress.length < 10 || userAddress.length > 100) {
+      newErrors.address = 'Address must be between 10 and 100 characters';
     }
     if (!userCity || !cityRegex.test(userCity) || userCity.length < 2 || userCity.length > 30) {
       newErrors.city = 'City must be 2-30 characters and contain only letters, spaces, and dots';
@@ -550,27 +617,23 @@ function Products() {
     }
   };
 
-  const handleClearCart = () => {
-    clearCart();
-  };
-
   const isCartEmpty = cart.length === 0;
 
   return (
     <div className="products">
       <Helmet>
         <title>UDHAYAM CRACKERS - Diwali Special Offers 2025</title>
-        <meta name="description" content="Browse our wide selection of high-quality crackers for all occasions. Filter by climate, search for specific products, and easily manage your cart." />
+        <meta name="description" content="Browse our wide selection of high-quality crackers for all occasions." />
         <meta property="og:title" content="Udhayam Crackers - Product Catalog" />
-        <meta property="og:description" content="Explore our diverse range of crackers. From morning to night, fancy to gift boxes, we have it all. Shop now for the best deals!" />
+        <meta property="og:description" content="Explore our diverse range of crackers. Shop now for the best deals!" />
         <meta property="og:image" content={defaultProductImage} />
         <meta property="og:url" content="https://www.udhayamcrackers.com/products" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Udhayam Crackers - Product Catalog" />
-        <meta name="twitter:description" content="Discover our extensive range of crackers for all your celebration needs. Easy filtering and search options available." />
+        <meta name="twitter:description" content="Discover our extensive range of crackers." />
         <meta name="twitter:image" content={defaultProductImage} />
-        <meta name="keywords" content="crackers, fireworks, Diwali, celebration, morning crackers, night crackers, fancy crackers, gift boxes" />
+        <meta name="keywords" content="crackers, fireworks, Diwali, celebration" />
         <meta name="author" content="Udhayam Crackers" />
         <meta name="robots" content="index, follow" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -580,7 +643,7 @@ function Products() {
               "@context": "http://schema.org",
               "@type": "ItemList",
               "name": "UDHAYAM CRACKERS Product Catalog",
-              "description": "Browse our wide selection of high-quality crackers for all occasions.",
+              "description": "Browse our wide selection of high-quality crackers.",
               "url": "https://www.udhayamcrackers.com/products",
               "numberOfItems": "${products.length}",
               "itemListElement": [
@@ -589,7 +652,7 @@ function Products() {
                     "@type": "Product",
                     "position": ${index + 1},
                     "name": "${product.productName || 'N/A'}",
-                    "description": "${product.productName || 'N/A'} - ${product.categorys || 'Unspecified'} climate cracker",
+                    "description": "${product.productName || 'N/A'} - ${product.categorys || 'Unspecified'}",
                     "image": "${getImageUrl(product)}",
                     "offers": {
                       "@type": "Offer",
@@ -632,13 +695,15 @@ function Products() {
       </div>
 
       <div className="table-container">
-        {(() => {
-          let globalIndex = 1;
-          
-          return categories.map(category => {
+        {isProductLoading ? (
+          <p className="text-gray-500">Loading products...</p>
+        ) : products.length === 0 ? (
+          <p className="text-red-500">No products available. Please contact support or check Firestore.</p>
+        ) : (
+          categories.map(category => {
             const categoryProducts = filteredProducts
               .filter(product => product.categorys === category)
-              .sort((a, b) => (a.categoryPosition || 1) - (b.categoryPosition || 1)); // Sort by categoryPosition if available
+              .sort((a, b) => (a.categoryPosition || 1) - (b.categoryPosition || 1));
 
             return (
               <div key={category}>
@@ -659,8 +724,8 @@ function Products() {
                         </tr>
                       </thead>
                       <tbody>
-                        {categoryProducts.map((product) => {
-                          const currentIndex = globalIndex++;
+                        {categoryProducts.map((product, index) => {
+                          const currentIndex = index + 1;
                           return (
                             <tr key={product.id}>
                               <td data-label="Preview">
@@ -681,7 +746,7 @@ function Products() {
                                   <button 
                                     onClick={() => decrementQuantity(product)} 
                                     className="quantity-button"
-                                    disabled={isLoading}
+                                    disabled={isLoading || !auth.currentUser}
                                   >
                                     <Minus size={15} />
                                   </button>
@@ -691,12 +756,12 @@ function Products() {
                                     onChange={(e) => updateCart(product, parseInt(e.target.value) || 0)}
                                     className="quantity-input"
                                     placeholder='0'
-                                    disabled={isLoading}
+                                    disabled={isLoading || !auth.currentUser}
                                   />
                                   <button 
                                     onClick={() => incrementQuantity(product)} 
                                     className="quantity-button"
-                                    disabled={isLoading}
+                                    disabled={isLoading || !auth.currentUser}
                                   >
                                     <Plus size={15} />
                                   </button>
@@ -714,8 +779,8 @@ function Products() {
                 </div>
               </div>
             );
-          });
-        })()}
+          })
+        )}
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-md" ref={cartSummaryRef}>
@@ -735,7 +800,7 @@ function Products() {
                 onChange={(e) => setUserName(e.target.value)}
                 className={`px-3 py-2 text-black mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 ${errors.name ? 'border-red-500' : ''}`}
                 required
-                disabled={isLoading}
+                disabled={isLoading || !auth.currentUser}
               />
               {errors.name && <span className="text-red-500 text-xs">{errors.name}</span>}
             </div>
@@ -749,7 +814,7 @@ function Products() {
                 onChange={(e) => setUserAddress(e.target.value)}
                 className={`text-black p-3 mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 ${errors.address ? 'border-red-500' : ''}`}
                 required
-                disabled={isLoading}
+                disabled={isLoading || !auth.currentUser}
               />
               {errors.address && <span className="text-red-500 text-xs">{errors.address}</span>}
             </div>
@@ -764,7 +829,7 @@ function Products() {
                 onChange={(e) => setUserCity(e.target.value)}
                 className={`px-3 py-2 text-black mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 ${errors.city ? 'border-red-500' : ''}`}
                 required
-                disabled={isLoading}
+                disabled={isLoading || !auth.currentUser}
               />
               {errors.city && <span className="text-red-500 text-xs">{errors.city}</span>}
             </div>
@@ -779,7 +844,7 @@ function Products() {
                 onChange={(e) => setUserPhone(e.target.value)}
                 className={`px-3 py-2 text-black mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 ${errors.phone ? 'border-red-500' : ''}`}
                 required
-                disabled={isLoading}
+                disabled={isLoading || !auth.currentUser}
               />
               {errors.phone && <span className="text-red-500 text-xs">{errors.phone}</span>}
             </div>
@@ -787,13 +852,13 @@ function Products() {
             <div className="flex space-x-4">
               <button
                 type="button"
-                onClick={handleClearCart}
+                onClick={clearCart}
                 className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition"
-                disabled={isLoading}
+                disabled={isLoading || !auth.currentUser}
               >
                 Clear Cart
               </button>
-              {!isCartEmpty && (
+              {!isCartEmpty && auth.currentUser && (
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -809,6 +874,9 @@ function Products() {
                   )}
                 </button>
               )}
+              {!auth.currentUser && (
+                <p className="text-red-500 text-sm">Please log in to place an order or modify the cart.</p>
+              )}
             </div>
           </form>
         ) : (
@@ -823,13 +891,14 @@ function Products() {
             <div className="flex space-x-4 flex-wrap">
               <button
                 type="button"
-                onClick={handleClearCart}
+                onClick={clearCart}
                 className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 transition"
+                disabled={!auth.currentUser}
               >
                 Clear Cart & New Order
               </button>
 
-              {!pdfDownloaded && (
+              {!pdfDownloaded && auth.currentUser && (
                 <button
                   type="button"
                   onClick={handlePdfDownload}
@@ -857,7 +926,7 @@ function Products() {
                 </div>
               )}
 
-              {showWhatsAppButton && (
+              {showWhatsAppButton && auth.currentUser && (
                 <button
                   type="button"
                   onClick={handleWhatsAppShare}
@@ -885,12 +954,12 @@ function Products() {
         )}
 
         <p className="mt-4 text-sm text-red-500">
-          Note: Please ensure that your order is selected correctly. Once you have verified your selection, click the "Purchase" button. The purchase process may take a few seconds, so we kindly ask for your patience. Minimum order value is ₹3000.
+          Note: Please ensure that your order is selected correctly. Minimum order value is ₹3000.
         </p>
 
         {isOrderPlaced && (
           <p className="mt-4 text-sm text-green-600">
-            <strong>Order Process:</strong> Your order has been placed successfully with Token No: {currentOrderData?.tokenNumber}! Please download the PDF invoice first, then use the WhatsApp button to share your order details along with the downloaded PDF.
+            <strong>Order Process:</strong> Your order has been placed successfully with Token No: {currentOrderData?.tokenNumber}! Please download the PDF invoice first, then use the WhatsApp button to share your order details.
           </p>
         )}
       </div>
