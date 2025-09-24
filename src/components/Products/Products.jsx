@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { ref, get, set } from "firebase/database";
 import { database, firestore, auth } from "../firebase";
-import { collection, addDoc, onSnapshot, getDocs, query, where, updateDoc, doc } from "firebase/firestore";
-import { Plus, Minus, Loader2, CheckCircle, Download } from "lucide-react";
+import { collection, addDoc, onSnapshot, getDocs, query, where, updateDoc, doc, enableNetwork, disableNetwork } from "firebase/firestore";
+import { Plus, Minus, Loader2, CheckCircle, Download, AlertCircle } from "lucide-react";
 import { jsPDF } from "jspdf";
 import "./Products.css";
 
@@ -32,6 +32,8 @@ function Products() {
   const [pdfDownloaded, setPdfDownloaded] = useState(false);
   const [showWhatsAppButton, setShowWhatsAppButton] = useState(false);
   const [isProductLoading, setIsProductLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const categories = [
     "ONE SOUND CRACKERS",
@@ -82,63 +84,197 @@ function Products() {
     }
   }, []);
 
+  // Enhanced retry mechanism for Firebase connection
+  const retryFirebaseOperation = async (operation, maxRetries = 3) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await enableNetwork(firestore);
+        const result = await operation();
+        setConnectionError(null);
+        return result;
+      } catch (error) {
+        console.error(`Firebase operation failed (attempt ${i + 1}):`, error);
+        setConnectionError(error.message);
+        
+        if (i === maxRetries - 1) {
+          throw error;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+  };
+
+  // Enhanced product loading with better error handling
+  const loadProducts = useCallback(async () => {
+    setIsProductLoading(true);
+    setConnectionError(null);
+
+    try {
+      await retryFirebaseOperation(async () => {
+        const productsCollection = collection(firestore, 'products');
+        
+        // Try direct query first
+        const snapshot = await getDocs(productsCollection);
+        console.log('Direct query result:', snapshot.size, 'documents');
+        
+        if (snapshot.empty) {
+          console.warn("No products found in Firestore 'products' collection");
+          
+          // Check if it's an authentication issue
+          if (!auth.currentUser) {
+            console.log("User not authenticated, attempting anonymous access");
+          }
+          
+          setProducts([]);
+          throw new Error("No products found. This might be due to security rules or collection name mismatch.");
+        } else {
+          const loadedProducts = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              categorys: data.climate || data.categorys || data.category || 'Unspecified',
+              imageUrl: data.imageUrl || defaultProductImage,
+              categoryPosition: data.categoryPosition || 1
+            };
+          });
+          
+          console.log('Successfully loaded products:', loadedProducts.length);
+          setProducts(loadedProducts);
+        }
+      });
+    } catch (error) {
+      console.error("Product loading error:", error);
+      setConnectionError(`Failed to load products: ${error.message}`);
+      
+      // Try alternative collection names
+      if (retryCount < 2) {
+        console.log("Trying alternative collection names...");
+        setRetryCount(prev => prev + 1);
+        
+        try {
+          const alternativeCollections = ['product', 'Product', 'PRODUCTS'];
+          for (const collectionName of alternativeCollections) {
+            try {
+              const altCollection = collection(firestore, collectionName);
+              const altSnapshot = await getDocs(altCollection);
+              if (!altSnapshot.empty) {
+                console.log(`Found products in '${collectionName}' collection`);
+                const loadedProducts = altSnapshot.docs.map(doc => ({
+                  id: doc.id,
+                  ...doc.data(),
+                  categorys: doc.data().climate || doc.data().categorys || doc.data().category || 'Unspecified',
+                  imageUrl: doc.data().imageUrl || defaultProductImage,
+                  categoryPosition: doc.data().categoryPosition || 1
+                }));
+                setProducts(loadedProducts);
+                setConnectionError(null);
+                break;
+              }
+            } catch (altError) {
+              console.log(`Collection '${collectionName}' not found or accessible`);
+            }
+          }
+        } catch (altError) {
+          console.error("Alternative collection search failed:", altError);
+        }
+      }
+    } finally {
+      setIsProductLoading(false);
+    }
+  }, [retryCount]);
+
   useEffect(() => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
   useEffect(() => {
-    setIsProductLoading(true);
-    const productsCollection = collection(firestore, 'products');
-    const invoiceCounterRef = ref(database, 'invoiceCounter');
-    const tokenCounterRef = ref(database, 'tokenCounter');
+    // Load products
+    loadProducts();
 
-    // Fetch products from Firestore
-    const unsubscribe = onSnapshot(productsCollection, (snapshot) => {
-      console.log('Firestore snapshot received, size:', snapshot.size);
-      if (snapshot.empty) {
-        console.warn("No products found in Firestore 'products' collection");
-        setProducts([]);
-      } else {
-        const loadedProducts = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            categorys: data.climate || data.categorys || data.category || 'Unspecified',
-            imageUrl: data.imageUrl || defaultProductImage,
-            categoryPosition: data.categoryPosition || 1
-          };
-        });
-        console.log('Fetched Products:', loadedProducts);
-        setProducts(loadedProducts);
-      }
-      setIsProductLoading(false);
-    }, (error) => {
-      console.error("Firestore fetch error:", error.code, error.message);
-      alert("Failed to fetch products: " + error.message);
-      setIsProductLoading(false);
-    });
-
-    // Fetch counters
-    const fetchCounters = async () => {
+    // Load counters with retry mechanism
+    const loadCounters = async () => {
       try {
-        const invoiceSnapshot = await get(invoiceCounterRef);
-        const tokenSnapshot = await get(tokenCounterRef);
-        const invoiceCounter = invoiceSnapshot.val() || 0;
-        const tokenCounter = tokenSnapshot.val() || 0;
-        console.log("Counters fetched:", { invoiceCounter, tokenCounter });
-        setLastInvoiceNumber(invoiceCounter);
-        setLastTokenNumber(tokenCounter);
+        await retryFirebaseOperation(async () => {
+          const invoiceCounterRef = ref(database, 'invoiceCounter');
+          const tokenCounterRef = ref(database, 'tokenCounter');
+          
+          const invoiceSnapshot = await get(invoiceCounterRef);
+          const tokenSnapshot = await get(tokenCounterRef);
+          const invoiceCounter = invoiceSnapshot.val() || 0;
+          const tokenCounter = tokenSnapshot.val() || 0;
+          
+          console.log("Counters loaded successfully:", { invoiceCounter, tokenCounter });
+          setLastInvoiceNumber(invoiceCounter);
+          setLastTokenNumber(tokenCounter);
+        });
       } catch (error) {
-        console.error("Counter fetch error:", error.code, error.message);
-        alert("Failed to fetch counters: " + error.message);
+        console.error("Counter loading error:", error);
+        // Use default values if counters can't be loaded
+        setLastInvoiceNumber(1000);
+        setLastTokenNumber(1000);
       }
     };
 
-    fetchCounters();
-    return () => unsubscribe();
-  }, []);
+    loadCounters();
+  }, [loadProducts]);
+
+  // Real-time listener with enhanced error handling
+  useEffect(() => {
+    if (products.length > 0) return; // Don't set up listener if products already loaded
+
+    let unsubscribe;
+    
+    const setupRealtimeListener = async () => {
+      try {
+        await enableNetwork(firestore);
+        const productsCollection = collection(firestore, 'products');
+        
+        unsubscribe = onSnapshot(
+          productsCollection, 
+          (snapshot) => {
+            console.log('Real-time update received, documents:', snapshot.size);
+            if (!snapshot.empty) {
+              const loadedProducts = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                  id: doc.id,
+                  ...data,
+                  categorys: data.climate || data.categorys || data.category || 'Unspecified',
+                  imageUrl: data.imageUrl || defaultProductImage,
+                  categoryPosition: data.categoryPosition || 1
+                };
+              });
+              setProducts(loadedProducts);
+              setConnectionError(null);
+              setIsProductLoading(false);
+            }
+          },
+          (error) => {
+            console.error("Real-time listener error:", error);
+            setConnectionError(`Real-time updates failed: ${error.message}`);
+            // Fallback to direct loading
+            loadProducts();
+          }
+        );
+      } catch (error) {
+        console.error("Failed to setup real-time listener:", error);
+        // Fallback to direct loading
+        loadProducts();
+      }
+    };
+
+    setupRealtimeListener();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [products.length, loadProducts]);
 
   useEffect(() => {
     const newTotalAmount = cart.reduce((total, item) => {
@@ -207,6 +343,7 @@ function Products() {
     }
   };
 
+  // Rest of the component methods remain the same...
   const generatePDF = (orderData) => {
     const doc = new jsPDF();
     doc.setFont("helvetica", "normal");
@@ -451,45 +588,46 @@ function Products() {
 
     console.log("Attempting to save order:", fullOrderData);
 
-    const invoiceCounterRef = ref(database, 'invoiceCounter');
-    const tokenCounterRef = ref(database, 'tokenCounter');
-
     try {
-      const ordersCollection = collection(firestore, 'orders');
-      const customerOrdersCollection = collection(firestore, 'customerOrders');
-      
-      const orderDocRef = await addDoc(ordersCollection, fullOrderData);
-      console.log("Order saved with ID:", orderDocRef.id);
-      
-      const customerOrderDocRef = await addDoc(customerOrdersCollection, {
-        id: Date.now(),
-        customer: fullOrderData.userName,
-        address: fullOrderData.userAddress,
-        city: fullOrderData.userCity,
-        phone: fullOrderData.userPhone,
-        tokenNumber: newTokenNumber.toString(),
-        invoiceNumber: newInvoiceNumber,
-        status: fullOrderData.status,
-        orderDate: fullOrderData.orderDate,
-        totalAmount: fullOrderData.totalAmount,
-        pdfDownloaded: false,
-        cart: fullOrderData.cart,
-        userId: auth.currentUser.uid
-      });
-      console.log("Customer order saved with ID:", customerOrderDocRef.id);
-      
-      await set(invoiceCounterRef, newInvoiceNumber);
-      await set(tokenCounterRef, newTokenNumber);
-      console.log("Counters updated:", { newInvoiceNumber, newTokenNumber });
-      
-      setLastInvoiceNumber(newInvoiceNumber);
-      setLastTokenNumber(newTokenNumber);
-      setCurrentOrderData(fullOrderData);
-      setIsOrderPlaced(true);
-      setShowSuccessAnimation(true);
-      setTimeout(() => setShowSuccessAnimation(false), 3000);
+      await retryFirebaseOperation(async () => {
+        const invoiceCounterRef = ref(database, 'invoiceCounter');
+        const tokenCounterRef = ref(database, 'tokenCounter');
+        const ordersCollection = collection(firestore, 'orders');
+        const customerOrdersCollection = collection(firestore, 'customerOrders');
+        
+        const orderDocRef = await addDoc(ordersCollection, fullOrderData);
+        console.log("Order saved with ID:", orderDocRef.id);
+        
+        const customerOrderDocRef = await addDoc(customerOrdersCollection, {
+          id: Date.now(),
+          customer: fullOrderData.userName,
+          address: fullOrderData.userAddress,
+          city: fullOrderData.userCity,
+          phone: fullOrderData.userPhone,
+          tokenNumber: newTokenNumber.toString(),
+          invoiceNumber: newInvoiceNumber,
+          status: fullOrderData.status,
+          orderDate: fullOrderData.orderDate,
+          totalAmount: fullOrderData.totalAmount,
+          pdfDownloaded: false,
+          cart: fullOrderData.cart,
+          userId: auth.currentUser.uid
+        });
+        console.log("Customer order saved with ID:", customerOrderDocRef.id);
+        
+        await set(invoiceCounterRef, newInvoiceNumber);
+        await set(tokenCounterRef, newTokenNumber);
+        console.log("Counters updated:", { newInvoiceNumber, newTokenNumber });
+        
+        setLastInvoiceNumber(newInvoiceNumber);
+        setLastTokenNumber(newTokenNumber);
+        setCurrentOrderData(fullOrderData);
+        setIsOrderPlaced(true);
+        setShowSuccessAnimation(true);
+        setTimeout(() => setShowSuccessAnimation(false), 3000);
 
-      alert(`Order placed successfully! Token: ${newTokenNumber}`);
+        alert(`Order placed successfully! Token: ${newTokenNumber}`);
+      });
     } catch (error) {
       console.error("Order save error:", error.code, error.message);
       alert(`Failed to process order: ${error.message}`);
@@ -529,15 +667,17 @@ function Products() {
         URL.revokeObjectURL(pdfUrl);
 
         try {
-          const customerOrdersCollection = collection(firestore, 'customerOrders');
-          const querySnapshot = await getDocs(query(customerOrdersCollection, where("tokenNumber", "==", currentOrderData.tokenNumber)));
-          if (!querySnapshot.empty) {
-            const orderDoc = querySnapshot.docs[0];
-            await updateDoc(doc(firestore, 'customerOrders', orderDoc.id), { pdfDownloaded: true });
-            console.log("PDF download status updated for order:", orderDoc.id);
-          } else {
-            console.warn("No matching customer order found for token:", currentOrderData.tokenNumber);
-          }
+          await retryFirebaseOperation(async () => {
+            const customerOrdersCollection = collection(firestore, 'customerOrders');
+            const querySnapshot = await getDocs(query(customerOrdersCollection, where("tokenNumber", "==", currentOrderData.tokenNumber)));
+            if (!querySnapshot.empty) {
+              const orderDoc = querySnapshot.docs[0];
+              await updateDoc(doc(firestore, 'customerOrders', orderDoc.id), { pdfDownloaded: true });
+              console.log("PDF download status updated for order:", orderDoc.id);
+            } else {
+              console.warn("No matching customer order found for token:", currentOrderData.tokenNumber);
+            }
+          });
         } catch (dbError) {
           console.error("PDF status update error:", dbError.message);
         }
@@ -617,6 +757,13 @@ function Products() {
     }
   };
 
+  // Retry button for connection errors
+  const handleRetry = () => {
+    setRetryCount(0);
+    setConnectionError(null);
+    loadProducts();
+  };
+
   const isCartEmpty = cart.length === 0;
 
   return (
@@ -637,34 +784,6 @@ function Products() {
         <meta name="author" content="Udhayam Crackers" />
         <meta name="robots" content="index, follow" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <script type="application/ld+json">
-          {`
-            {
-              "@context": "http://schema.org",
-              "@type": "ItemList",
-              "name": "UDHAYAM CRACKERS Product Catalog",
-              "description": "Browse our wide selection of high-quality crackers.",
-              "url": "https://www.udhayamcrackers.com/products",
-              "numberOfItems": "${products.length}",
-              "itemListElement": [
-                ${products.map((product, index) => `
-                  {
-                    "@type": "Product",
-                    "position": ${index + 1},
-                    "name": "${product.productName || 'N/A'}",
-                    "description": "${product.productName || 'N/A'} - ${product.categorys || 'Unspecified'}",
-                    "image": "${getImageUrl(product)}",
-                    "offers": {
-                      "@type": "Offer",
-                      "price": "${product.ourPrice || 0}",
-                      "priceCurrency": "INR"
-                    }
-                  }
-                `).join(',')}
-              ]
-            }
-          `}
-        </script>
       </Helmet>
 
       {showFixedTotal && (
@@ -678,6 +797,37 @@ function Products() {
         <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-500 text-white p-4 rounded-full flex items-center justify-center animate-bounce z-50">
           <CheckCircle size={32} className="mr-2" />
           <span className="text-lg">Order Placed Successfully!</span>
+        </div>
+      )}
+
+      {/* Connection Error Display */}
+      {connectionError && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertCircle className="mr-2" size={20} />
+            <span>{connectionError}</span>
+          </div>
+          <button
+            onClick={handleRetry}
+            className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Debug Info for Development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4">
+          <strong>Debug Info:</strong>
+          <ul className="text-sm mt-2">
+            <li>Environment: {process.env.NODE_ENV}</li>
+            <li>Firebase Project: {process.env.REACT_APP_FIREBASE_PROJECT_ID || 'Not set'}</li>
+            <li>Auth Domain: {process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || 'Not set'}</li>
+            <li>Products Loaded: {products.length}</li>
+            <li>User Authenticated: {auth.currentUser ? 'Yes' : 'No'}</li>
+            <li>Retry Count: {retryCount}</li>
+          </ul>
         </div>
       )}
 
@@ -696,9 +846,30 @@ function Products() {
 
       <div className="table-container">
         {isProductLoading ? (
-          <p className="text-gray-500">Loading products...</p>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="animate-spin mr-2" size={24} />
+            <span>Loading products...</span>
+          </div>
         ) : products.length === 0 ? (
-          <p className="text-red-500">No products available. Please contact support or check Firestore.</p>
+          <div className="text-center py-8">
+            <AlertCircle className="mx-auto mb-4" size={48} color="#ef4444" />
+            <p className="text-red-500 text-lg">No products available</p>
+            <p className="text-gray-600 text-sm mt-2">
+              This could be due to:
+              <ul className="list-disc list-inside mt-2">
+                <li>Firebase security rules blocking access</li>
+                <li>Incorrect collection name in Firestore</li>
+                <li>Network connectivity issues</li>
+                <li>Authentication requirements not met</li>
+              </ul>
+            </p>
+            <button
+              onClick={handleRetry}
+              className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+              Try Again
+            </button>
+          </div>
         ) : (
           categories.map(category => {
             const categoryProducts = filteredProducts
